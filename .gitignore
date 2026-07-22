@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Ambientes
+.venv/
+venv/
+env/
+
+# Testes / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Saídas de exemplo
+demo_brasileirao.html
+
+# SO
+Thumbs.db
+.DS_Store

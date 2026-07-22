@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dashgusbr"
+version = "0.1.0"
+description = "Camada de consumo e visualização (Plotly) do histórico de partidas do Campeonato Brasileiro, sobre a OBT do projeto Infra-Brasileirao."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [
+    { name = "Gustavo Gasperetti" },
+]
+keywords = ["brasileirao", "futebol", "dados", "plotly", "pandas", "dataviz"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "pandas>=2.0",
+    "plotly>=5.19",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/gustavogasperetti/DashGusBr-lib"
+Repository = "https://github.com/gustavogasperetti/DashGusBr-lib"
+Issues = "https://github.com/gustavogasperetti/DashGusBr-lib/issues"
+"Fonte de dados (ETL)" = "https://github.com/gustavogasperetti/Infra-Brasileirao"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dashgusbr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "rede: testes que acessam a internet (desmarcados por padrão: -m 'not rede')",
+]
+addopts = "-m 'not rede'"
