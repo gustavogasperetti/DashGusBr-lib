@@ -25,7 +25,7 @@ from . import analytics, config, data, schema, viz
 from .client import Brasileirao
 from .data import carregar_dados
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "Brasileirao",
