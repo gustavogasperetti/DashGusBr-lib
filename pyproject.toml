@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dashgusbr"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Camada de consumo e visualização (Plotly) do histórico de partidas do Campeonato Brasileiro, sobre a OBT do projeto Infra-Brasileirao."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [
-    { name = "Gustavo Gasperetti" },
+    { name = "Gustavo Gasperetti", email = "gustavolgasperetti@gmail.com" },
 ]
 keywords = ["brasileirao", "futebol", "dados", "plotly", "pandas", "dataviz"]
 classifiers = [
@@ -42,6 +42,9 @@ Homepage = "https://github.com/gustavogasperetti/DashGusBr-lib"
 Repository = "https://github.com/gustavogasperetti/DashGusBr-lib"
 Issues = "https://github.com/gustavogasperetti/DashGusBr-lib/issues"
 "Fonte de dados (ETL)" = "https://github.com/gustavogasperetti/Infra-Brasileirao"
+
+[tool.hatch.version]
+path = "src/dashgusbr/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dashgusbr"]
