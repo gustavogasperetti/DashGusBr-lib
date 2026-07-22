@@ -1,0 +1,88 @@
+name: Release
+
+# Botão "Run workflow" na aba Actions: escolha patch/minor/major e o resto é automático:
+# 1. calcula e grava a nova versão em src/dashgusbr/__init__.py
+# 2. commita o bump na main
+# 3. cria a tag vX.Y.Z e a Release com notas geradas a partir dos commits
+# 4. dispara o workflow de publicação (publish.yml) na tag -> sobe no PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Tipo de versão"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write   # commitar o bump e criar a tag/release
+  actions: write    # disparar o workflow publish.yml
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # histórico completo para as notas automáticas
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Calcular nova versão
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          python - <<'PY'
+          import os, re, pathlib
+          bump = os.environ["BUMP"]
+          p = pathlib.Path("src/dashgusbr/__init__.py")
+          text = p.read_text(encoding="utf-8")
+          m = re.search(r'__version__ = "(\d+)\.(\d+)\.(\d+)"', text)
+          if not m:
+              raise SystemExit("Nao encontrei __version__ em src/dashgusbr/__init__.py")
+          major, minor, patch = map(int, m.groups())
+          if bump == "major":
+              major, minor, patch = major + 1, 0, 0
+          elif bump == "minor":
+              minor, patch = minor + 1, 0
+          else:
+              patch += 1
+          new = f"{major}.{minor}.{patch}"
+          text = re.sub(r'__version__ = "\d+\.\d+\.\d+"', f'__version__ = "{new}"', text)
+          p.write_text(text, encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"version={new}\n")
+          print(f"Nova versao: {new}")
+          PY
+
+      - name: Commitar bump de versão
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/dashgusbr/__init__.py
+          git commit -m "chore: release v${{ steps.bump.outputs.version }}"
+          git push
+
+      - name: Criar release com notas automáticas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.bump.outputs.version }}" \
+            --title "v${{ steps.bump.outputs.version }}" \
+            --generate-notes \
+            --target main
+
+      - name: Disparar publicação no PyPI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run publish.yml --ref "v${{ steps.bump.outputs.version }}"
