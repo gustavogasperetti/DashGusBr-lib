@@ -27,7 +27,7 @@ from .client import Brasileirao
 from .data import carregar_dados
 from .export import salvar_html, salvar_imagem
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "Brasileirao",
