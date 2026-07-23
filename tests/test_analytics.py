@@ -2,7 +2,6 @@ import pytest
 
 from dashgusbr import analytics
 
-
 # -- classificação -----------------------------------------------------------
 
 
@@ -14,7 +13,8 @@ def test_classificacao_1971_ordem_e_pontos_era_2_pontos(obt):
     palmeiras = tabela.iloc[0]
     assert palmeiras["jogos"] == 4
     assert (palmeiras["vitorias"], palmeiras["empates"], palmeiras["derrotas"]) == (2, 1, 1)
-    assert (palmeiras["gols_pro"], palmeiras["gols_contra"], palmeiras["saldo"]) == (7, 3, 4)
+    gols = (palmeiras["gols_pro"], palmeiras["gols_contra"], palmeiras["saldo"])
+    assert gols == (7, 3, 4)
     # vitória valia 2 pontos em 1971: 5 pts em 4 jogos = 62.5%
     assert palmeiras["aproveitamento"] == 62.5
 

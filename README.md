@@ -44,8 +44,67 @@ br.plot_placares().show()              # heatmap: frequência de cada placar
 br.goleadas(10)                        # DataFrame: as 10 maiores goleadas
 ```
 
+Mais análises prontas:
+
+```python
+br.plot_corrida_titulo(2023, n=4).show()   # evolução dos 4 primeiros colocados
+br.plot_casa_fora("Grêmio").show()         # V/E/D como mandante × visitante
+br.plot_contra("Palmeiras").show()         # aproveitamento contra cada adversário
+br.plot_estados().show()                   # jogos por estado (UF)
+br.plot_lideres().show()                   # vezes que cada clube liderou os pontos corridos
+br.sequencias("Flamengo")                  # DataFrame: maiores sequências (vitórias, invencibilidade...)
+br.forma("Botafogo", n=5)                  # DataFrame: os últimos 5 jogos
+br.resumo("Cruzeiro")                      # dict: cartão-resumo do clube (campanhas, recordes)
+br.ranking()                               # DataFrame: tabela histórica geral
+br.classicos(); br.fases()                 # clássicos × demais jogos; mata-mata × pontos corridos
+```
+
 Métodos utilitários: `br.anos()`, `br.times(ano=2023)`, `br.partidas(ano=2023, time="Grêmio")`,
-`br.recarregar()` (força novo download).
+`br.recarregar()` (força novo download). Nomes de time aceitam variações de caixa e acento
+(`"gremio"` resolve para `"Grêmio"`).
+
+## Como personalizar os gráficos
+
+Todo método `plot_*` aceita `titulo=` e argumentos de layout do Plotly, repassados a
+`fig.update_layout` — e a figura retornada é um `plotly.graph_objects.Figure` normal, então
+qualquer ajuste do Plotly funciona depois:
+
+```python
+fig = br.plot_tabela(2023, titulo="Meu título", width=1000, height=700)
+fig = br.plot_gols_por_temporada(template="plotly_dark")   # troca o tema
+
+fig.update_traces(marker_color="#ff5722")                  # pós-processamento livre
+fig.add_annotation(text="Fonte: OBT Infra-Brasileirao", xref="paper", x=1, y=-0.12)
+```
+
+Nas funções de `dashgusbr.viz`, o parâmetro `cores=` substitui a paleta padrão
+(`viz.classificacao(tab, cores="#ff5722")`).
+
+### Cores oficiais dos clubes
+
+Os gráficos por time aceitam `cores_times=True` para pintar cada clube com sua cor de
+identidade (Palmeiras → verde, Flamengo → vermelho, Grêmio → azul...):
+
+```python
+br.plot_corrida_titulo(2023, n=4, cores_times=True).show()
+br.plot_confronto("Flamengo", "Palmeiras", cores_times=True).show()
+
+from dashgusbr import cor_time
+cor_time("Palmeiras")   # '#006437' — para usar em gráficos próprios
+```
+
+Clubes fora do mapa (e dois clubes de mesma cor no mesmo gráfico — ex.: dois alvinegros)
+caem automaticamente na paleta categórica padrão. O recurso é **opt-in**: cores de clube
+não são seguras para daltonismo; a paleta padrão da biblioteca é validada.
+
+### Exportação
+
+```python
+from dashgusbr import salvar_html, salvar_imagem
+
+salvar_html(fig, "grafico.html")            # página interativa
+salvar_imagem(fig, "grafico.png", escala=2) # PNG/SVG/PDF — requer: pip install dashgusbr[imagem]
+```
 
 ## Uso avançado — camadas puras
 
@@ -63,9 +122,10 @@ fig = viz.classificacao(tab)                      # DataFrame → plotly Figure
 
 | Camada | Responsabilidade | Principais funções |
 |---|---|---|
-| `dashgusbr.data` | carga, fallback e cache | `carregar_dados`, `limpar_cache` |
-| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `estatisticas_temporada`, `distribuicao_placares`, `maiores_goleadas` |
-| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares` |
+| `dashgusbr.data` | carga, fallback e caches (memória + disco) | `carregar_dados`, `limpar_cache` |
+| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `casa_fora`, `sequencias`, `forma_recente`, `desempenho_contra`, `corrida_titulo`, `lideres_temporada`, `ranking_historico`, `resumo_time`, `estatisticas_temporada`, `estatisticas_estados`, `comparar_classicos`, `comparar_fases`, `distribuicao_placares`, `maiores_goleadas` |
+| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `casa_fora`, `desempenho_contra`, `estados`, `lideres`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares` |
+| `dashgusbr.export` | exportação de figuras | `salvar_html`, `salvar_imagem` |
 
 ## Fontes de dados
 
@@ -77,6 +137,15 @@ br = Brasileirao()                       # auto: GitHub → Sheets
 br = Brasileirao(fonte="sheets")         # força o Google Sheets
 br = Brasileirao(fonte="dados/obt.csv")  # arquivo local no mesmo schema
 br = Brasileirao(github_url="https://raw.githubusercontent.com/.../obt.csv")
+```
+
+O CSV baixado fica em cache em disco (`~/.dashgusbr/cache`, validade de 24h), acelerando novas
+sessões e permitindo uso offline; controle com `carregar_dados(cache_disco=..., validade_horas=...)`
+e limpe com `data.limpar_cache(disco=True)`. Para acompanhar o download:
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO)   # logger "dashgusbr"
 ```
 
 ## Schema da OBT

@@ -34,7 +34,10 @@ def main() -> None:
 
     destino = "demo_brasileirao.html"
     with open(destino, "w", encoding="utf-8") as saida:
-        saida.write(f"<html><head><meta charset='utf-8'><title>dashgusbr — {ano}</title></head><body>")
+        saida.write(
+            f"<html><head><meta charset='utf-8'>"
+            f"<title>dashgusbr — {ano}</title></head><body>"
+        )
         for i, fig in enumerate(figuras):
             saida.write(fig.to_html(full_html=False, include_plotlyjs=(i == 0)))
         saida.write("</body></html>")

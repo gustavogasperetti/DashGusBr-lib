@@ -21,18 +21,25 @@ Uso avançado (camadas puras)::
     fig = viz.classificacao(tab)
 """
 
-from . import analytics, config, data, schema, viz
+from . import analytics, config, data, export, schema, viz
+from ._cores_times import cor_time, cores_para_times
 from .client import Brasileirao
 from .data import carregar_dados
+from .export import salvar_html, salvar_imagem
 
 __version__ = "0.1.0"
 
 __all__ = [
     "Brasileirao",
     "carregar_dados",
+    "cor_time",
+    "cores_para_times",
+    "salvar_html",
+    "salvar_imagem",
     "analytics",
     "config",
     "data",
+    "export",
     "schema",
     "viz",
     "__version__",
