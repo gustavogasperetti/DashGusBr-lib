@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import logging
 import time as _time
 import urllib.request
@@ -39,11 +40,13 @@ class DadosIndisponiveisError(RuntimeError):
 
 
 def limpar_cache(disco: bool = False) -> None:
-    """Descarta os DataFrames em memória; ``disco=True`` também apaga os CSVs locais."""
+    """Descarta os DataFrames em memória; ``disco=True`` também apaga os arquivos locais."""
     _CACHE.clear()
+    _CACHE_GEOJSON.clear()
     if disco and DIR_CACHE.exists():
-        for arquivo in DIR_CACHE.glob("*.csv"):
-            arquivo.unlink(missing_ok=True)
+        for padrao in ("*.csv", "*.json"):
+            for arquivo in DIR_CACHE.glob(padrao):
+                arquivo.unlink(missing_ok=True)
 
 
 def _arquivo_cache(url: str) -> Path:
@@ -89,8 +92,10 @@ def _ler_url(
 
     if cache_disco and not forcar_download and arquivo.exists():
         idade_horas = (_time.time() - arquivo.stat().st_mtime) / 3600
-        # < estrito: validade_horas=0 significa "nunca aceitar cache do disco"
-        if idade_horas < validade_horas:
+        # validade_horas<=0 = "nunca aceitar cache do disco" — comparar só a
+        # idade não basta: o mtime pode ficar milissegundos À FRENTE do
+        # relógio (granularidade do filesystem), deixando a idade negativa
+        if validade_horas > 0 and idade_horas < validade_horas:
             logger.info(
                 "Usando cache em disco (%.1fh de idade): %s", idade_horas, arquivo
             )
@@ -191,3 +196,55 @@ def carregar_dados(
     raise DadosIndisponiveisError(
         f"Nenhuma fonte de dados pôde ser carregada:\n  - {detalhes}"
     )
+
+
+_CACHE_GEOJSON: "dict[str, dict]" = {}
+
+
+def carregar_geojson_estados(
+    url: Optional[str] = None,
+    cache_disco: bool = True,
+    validade_horas: float = 24 * 30,
+) -> dict:
+    """Baixa (e cacheia) o GeoJSON dos estados do Brasil para o mapa coroplético.
+
+    Usa a mesma infraestrutura da OBT: retry com backoff, cache em memória e
+    em disco (``~/.dashgusbr/cache``). Geometria de UF quase não muda — a
+    validade padrão do cache é 30 dias. As features precisam ter a sigla da
+    UF em ``properties.sigla`` (padrão da fonte em
+    :data:`dashgusbr.config.GEOJSON_UF_URL`).
+    """
+    url = url or config.GEOJSON_UF_URL
+    if url in _CACHE_GEOJSON:
+        return _CACHE_GEOJSON[url]
+
+    arquivo = _arquivo_cache(url).with_suffix(".json")
+    conteudo: Optional[bytes] = None
+    if cache_disco and arquivo.exists():
+        idade_horas = (_time.time() - arquivo.stat().st_mtime) / 3600
+        if validade_horas > 0 and idade_horas < validade_horas:
+            logger.info("Usando GeoJSON do cache em disco: %s", arquivo)
+            conteudo = arquivo.read_bytes()
+
+    if conteudo is None:
+        try:
+            conteudo = _baixar(url)
+        except Exception:
+            if cache_disco and arquivo.exists():
+                logger.warning(
+                    "Download do GeoJSON falhou; usando cache DESATUALIZADO: %s",
+                    arquivo,
+                )
+                conteudo = arquivo.read_bytes()
+            else:
+                raise
+        else:
+            if cache_disco:
+                DIR_CACHE.mkdir(parents=True, exist_ok=True)
+                arquivo.write_bytes(conteudo)
+
+    geojson = json.loads(conteudo.decode("utf-8"))
+    if not isinstance(geojson, dict) or "features" not in geojson:
+        raise ValueError(f"O conteúdo de {url!r} não parece ser um GeoJSON válido.")
+    _CACHE_GEOJSON[url] = geojson
+    return geojson

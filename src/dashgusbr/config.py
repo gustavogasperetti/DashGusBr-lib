@@ -19,6 +19,13 @@ SHEETS_URL = (
     "1s_Pk7wYAZ4DjVRhamLJVZI26sIMdNvF-eFMkMGxWeIA/edit"
 )
 
+# GeoJSON dos estados do Brasil (features com properties.sigla = UF),
+# usado pelo mapa coroplético (viz.mapa_estados). Fonte pública estável.
+GEOJSON_UF_URL = (
+    "https://raw.githubusercontent.com/codeforamerica/click_that_hood/"
+    "master/public/data/brazil-states.geojson"
+)
+
 _SHEETS_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9_-]+)")
 
 

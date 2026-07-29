@@ -16,7 +16,7 @@ from typing import Iterable, Optional, Union
 import pandas as pd
 import plotly.graph_objects as go
 
-from . import analytics, data, viz
+from . import analytics, data, schema, viz
 
 
 class Brasileirao:
@@ -74,11 +74,17 @@ class Brasileirao:
     def partidas(
         self, ano: Optional[int] = None, time: Optional[str] = None
     ) -> pd.DataFrame:
-        """Partidas da base, opcionalmente filtradas por temporada e/ou time."""
+        """Partidas da base, opcionalmente filtradas por temporada e/ou time.
+
+        O nome do time é resolvido com a mesma tolerância dos demais métodos
+        ("gremio" → "Grêmio"); nome desconhecido é erro com sugestões, nunca
+        um filtro vazio silencioso.
+        """
         partidas = self.df
         if ano is not None:
             partidas = partidas[partidas["ano_campeonato"] == ano]
         if time is not None:
+            time = analytics._resolver_time(self.df, time)
             partidas = partidas[
                 (partidas["mandante"] == time) | (partidas["visitante"] == time)
             ]
@@ -234,6 +240,26 @@ class Brasileirao:
             **layout_kwargs,
         )
 
+    def confronto_evolucao(self, time_a: str, time_b: str) -> pd.DataFrame:
+        """Linha do tempo do confronto: saldo acumulado na perspectiva de ``time_a``."""
+        return analytics.evolucao_confronto(self.df, time_a, time_b)
+
+    def plot_confronto_evolucao(
+        self,
+        time_a: str,
+        time_b: str,
+        titulo: Optional[str] = None,
+        cores_times: bool = False,
+        **layout_kwargs,
+    ) -> go.Figure:
+        """Linha do saldo acumulado do confronto direto ao longo dos anos."""
+        return viz.evolucao_confronto(
+            self.confronto_evolucao(time_a, time_b),
+            titulo=titulo,
+            usar_cores_times=cores_times,
+            **layout_kwargs,
+        )
+
     def contra(self, time: str, min_jogos: int = 1) -> pd.DataFrame:
         """Retrospecto do time contra cada adversário (todas as fases)."""
         return analytics.desempenho_contra(self.df, time, min_jogos=min_jogos)
@@ -297,6 +323,35 @@ class Brasileirao:
             self.placares(ano=ano, max_gols=max_gols), titulo=titulo, **layout_kwargs
         )
 
+    def saldos(self, ano: Optional[int] = None, max_saldo: int = 5) -> pd.DataFrame:
+        """Distribuição do saldo de gols por jogo (mandante − visitante)."""
+        return analytics.distribuicao_saldos(self.df, ano=ano, max_saldo=max_saldo)
+
+    def plot_saldos(
+        self,
+        ano: Optional[int] = None,
+        max_saldo: int = 5,
+        titulo: Optional[str] = None,
+        **layout_kwargs,
+    ) -> go.Figure:
+        """Histograma do saldo de gols por jogo (a assimetria é o fator casa)."""
+        titulo = titulo or (
+            f"Brasileirão {ano} — saldo de gols por jogo"
+            if ano is not None
+            else "Saldo de gols por jogo (1971–hoje)"
+        )
+        return viz.distribuicao_saldos(
+            self.saldos(ano=ano, max_saldo=max_saldo), titulo=titulo, **layout_kwargs
+        )
+
+    def gols_por_decada(self) -> pd.DataFrame:
+        """Média de gols por jogo em cada década (inflação/deflação de gols)."""
+        return analytics.media_gols_por_decada(self.df)
+
+    def viagem(self) -> pd.DataFrame:
+        """Desempenho do visitante dentro × fora do seu estado (fator viagem)."""
+        return analytics.fator_viagem(self.df)
+
     def goleadas(self, n: int = 10) -> pd.DataFrame:
         """As ``n`` maiores goleadas da história do campeonato."""
         return analytics.maiores_goleadas(self.df, n=n)
@@ -310,6 +365,28 @@ class Brasileirao:
     ) -> go.Figure:
         """Barras de jogos como mandante por estado."""
         return viz.estados(self.estados(), titulo=titulo, **layout_kwargs)
+
+    def plot_mapa_estados(
+        self,
+        metrica: str = "jogos",
+        titulo: Optional[str] = None,
+        geojson: Optional[dict] = None,
+        **layout_kwargs,
+    ) -> go.Figure:
+        """Mapa coroplético do Brasil com uma métrica por UF.
+
+        Sem ``geojson``, baixa (e cacheia em disco) o GeoJSON público das UFs
+        — requer internet na primeira vez.
+        """
+        if geojson is None:
+            geojson = data.carregar_geojson_estados()
+        return viz.mapa_estados(
+            self.estados(), geojson, metrica=metrica, titulo=titulo, **layout_kwargs
+        )
+
+    def validar(self) -> pd.DataFrame:
+        """Relatório de consistência dos dados carregados (uma linha por checagem)."""
+        return schema.relatorio_consistencia(self.df)
 
     def lideres(self) -> pd.DataFrame:
         """O líder dos pontos corridos de cada temporada (líder ≠ campeão até 2002)."""

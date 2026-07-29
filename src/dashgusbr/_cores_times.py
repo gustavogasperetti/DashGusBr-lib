@@ -76,6 +76,73 @@ CORES_TIMES = {
     "brasil de pelotas": "#c8161d",  # vermelho xavante
     "operario ferroviario": "#1b1b1b",  # preto fantasma
     "ituano": "#c8102e",  # vermelho galo de itu
+    # Cauda longa (clubes históricos da base 1971–hoje)
+    "alecrim": "#00843d",  # verde periquito
+    "america sp": "#e4032e",  # vermelho rubro
+    "americano": "#1b1b1b",  # preto alvinegro
+    "asa": "#1b1b1b",  # preto fantasma de arapiraca
+    "anapolina": "#d20a11",  # vermelho rubra
+    "anapolis": "#005baa",  # azul galo da comarca
+    "botafogo pb": "#1b1b1b",  # preto belo
+    "brasiliense": "#d7a000",  # amarelo jacaré (escurecido)
+    "caldense": "#006c3b",  # verde veterana
+    "campinense": "#c8102e",  # vermelho rubro-negro
+    "campo grande rj": "#d20a11",  # vermelho alvirrubro
+    "catuense": "#005baa",  # azul
+    "caxias": "#7a1f2b",  # grená
+    "central": "#1b1b1b",  # preto alvinegro
+    "colorado": "#e4032e",  # vermelho (Colorado-PR)
+    "comercial": "#1b1b1b",  # preto alvinegro (Ribeirão Preto)
+    "comercial ms": "#c8102e",  # vermelho e preto
+    "confianca": "#005baa",  # azul dragão
+    "corinthians al": "#1b1b1b",  # preto alvinegro
+    "desportiva capixaba": "#7a1f2b",  # grená
+    "desportiva ferroviaria": "#7a1f2b",  # grená
+    "ferroviaria": "#7a1f2b",  # grená de araraquara
+    "ferroviario": "#c8102e",  # vermelho coral
+    "flamengo pi": "#c52613",  # vermelho rubro-negro
+    "fluminense de feira": "#7a1f2b",  # grená touro do sertão
+    "gama": "#006c3b",  # verde periquito
+    "goiania": "#1b1b1b",  # preto galo
+    "goytacaz": "#00539f",  # azul alvianil
+    "gremio barueri": "#cfa000",  # amarelo (escurecido)
+    "gremio maringa": "#005baa",  # azul
+    "guarany de sobral": "#d20a11",  # vermelho
+    "inter sm": "#e5050f",  # vermelho (Santa Maria)
+    "inter de limeira": "#d20a11",  # vermelho leão
+    "juventus sp": "#7a1f2b",  # grená da mooca
+    "maranhao": "#c8102e",  # vermelho
+    "marcilio dias": "#10316b",  # azul marinheiro
+    "matonense": "#006c3b",  # verde
+    "mixto": "#1b1b1b",  # preto tigre
+    "mogi mirim": "#008542",  # verde sapão
+    "moto club": "#d20a11",  # vermelho papão
+    "nacional am": "#00539f",  # azul naça
+    "nacional sp": "#005baa",  # azul
+    "noroeste": "#d20a11",  # vermelho norusca
+    "novo hamburgo": "#00539f",  # azul anilado
+    "olaria": "#005baa",  # azul
+    "paulista": "#c8102e",  # vermelho galo do japi
+    "portuguesa santista": "#046a38",  # verde briosa
+    "rio branco ac": "#c8102e",  # vermelho estrelão
+    "rio branco es": "#1b1b1b",  # preto capa-preta
+    "rio branco pr": "#d20a11",  # vermelho leão da estradinha
+    "rio branco sp": "#1b1b1b",  # preto tigre de americana
+    "rio negro am": "#1b1b1b",  # preto galo da praça
+    "river pi": "#d20a11",  # vermelho galo carijó
+    "sao bento": "#005baa",  # azul de sorocaba
+    "sao raimundo am": "#005baa",  # azul
+    "sergipe": "#e4032e",  # vermelho gipão
+    "treze": "#1b1b1b",  # preto galo da borborema
+    "tuna luso": "#00539f",  # azul águia do souza
+    "uberaba": "#d20a11",  # vermelho
+    "uberlandia": "#008542",  # verde periquito
+    "uniao barbarense": "#005baa",  # azul leão da treze
+    "uniao sao joao": "#008542",  # verde de araras
+    "villa nova mg": "#d20a11",  # vermelho leão do bonfim
+    "volta redonda": "#d7a000",  # amarelo voltaço (escurecido)
+    "xv de jau": "#1b1b1b",  # preto alvinegro
+    "xv de piracicaba": "#1b1b1b",  # preto alvinegro
 }
 
 # Apelidos e variações de grafia -> chave canônica (ambos normalizados)

@@ -123,3 +123,86 @@ def validar(df: pd.DataFrame) -> pd.DataFrame:
             f"Colunas faltantes: {faltantes}. Colunas presentes: {list(df.columns)}"
         )
     return df
+
+
+def relatorio_consistencia(df: pd.DataFrame) -> pd.DataFrame:
+    """Checagens de consistência dos DADOS (além da presença de colunas).
+
+    Não levanta erro: devolve um relatório com uma linha por checagem —
+    ``checagem``, ``problemas`` (nº de partidas afetadas) e ``exemplos``
+    (até 5 ``id_partida``) — para inspecionar a qualidade da OBT ou de um
+    CSV próprio antes de confiar nas análises.
+
+    Checagens: gols negativos, resultado incoerente com o placar, resultados
+    dos dois lados não espelhados, pontos incoerentes com o resultado,
+    ``total_gols`` divergente da soma, datas ausentes/implausíveis (fora de
+    1971..ano atual + 1) e ``id_partida`` duplicado.
+    """
+    jogos = df.dropna(subset=["gols_mandante", "gols_visitante"])
+    gm, gv = jogos["gols_mandante"], jogos["gols_visitante"]
+
+    resultado_esperado = (
+        pd.Series("E", index=jogos.index)
+        .mask(gm > gv, "V")
+        .mask(gm < gv, "D")
+    )
+    espelho = {"V": "D", "E": "E", "D": "V"}
+
+    pontos_ok = pd.Series(True, index=jogos.index)
+    if "pontos_mandante" in jogos.columns:
+        pm = jogos["pontos_mandante"]
+        pontos_ok &= (
+            ((jogos["resultado_mandante"] == "V") & pm.isin([2, 3]))
+            | ((jogos["resultado_mandante"] == "E") & (pm == 1))
+            | ((jogos["resultado_mandante"] == "D") & (pm == 0))
+        )
+
+    limite_ano = pd.Timestamp.now().year + 1
+    datas_ruins = df["data"].isna() | (df["data"].dt.year < 1971) | (
+        df["data"].dt.year > limite_ano
+    )
+
+    checagens = [
+        ("gols negativos", jogos[(gm < 0) | (gv < 0)]),
+        (
+            "resultado do mandante incoerente com o placar",
+            jogos[jogos["resultado_mandante"] != resultado_esperado],
+        ),
+        (
+            "resultados dos dois lados não espelhados",
+            jogos[
+                jogos["resultado_visitante"]
+                != jogos["resultado_mandante"].map(espelho)
+            ],
+        ),
+        ("pontos incoerentes com o resultado", jogos[~pontos_ok]),
+        (
+            "total_gols diferente da soma do placar",
+            jogos[jogos["total_gols"] != gm + gv]
+            if "total_gols" in jogos.columns
+            else jogos.iloc[0:0],
+        ),
+        ("data ausente ou fora de 1971..hoje", df[datas_ruins]),
+        (
+            "id_partida duplicado",
+            df[df["id_partida"].duplicated(keep=False)]
+            if "id_partida" in df.columns
+            else df.iloc[0:0],
+        ),
+    ]
+
+    linhas = []
+    for nome, problematicos in checagens:
+        ids = (
+            problematicos["id_partida"].dropna().astype(int).head(5).tolist()
+            if "id_partida" in problematicos.columns
+            else []
+        )
+        linhas.append(
+            {
+                "checagem": nome,
+                "problemas": int(len(problematicos)),
+                "exemplos": ", ".join(str(i) for i in ids),
+            }
+        )
+    return pd.DataFrame(linhas)

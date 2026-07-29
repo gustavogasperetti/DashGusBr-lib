@@ -8,6 +8,44 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Tema escuro** próprio: template `dashgusbr_escuro`, aplicável com
+  `template="dashgusbr_escuro"` em qualquer `plot_*`/`viz.*`.
+- **Contraste automático**: rótulos que caem dentro de barras recebem cor de
+  texto por luminância (`cor_texto_para`), legíveis sobre barras escuras.
+- **Controle de rótulos/legenda**: `mostrar_valores=` e `mostrar_legenda=`
+  nas funções `viz.*` com rótulos/legenda.
+- **CLI**: `python -m dashgusbr tabela 2023` (também `goleadas`, `ranking`,
+  `resumo`, `times`, `anos`, `validar`; `--fonte` e `--html`).
+- **Linha do tempo do confronto**: `analytics.evolucao_confronto` +
+  `br.plot_confronto_evolucao(a, b)` (saldo acumulado na história).
+- **Fator viagem**: `analytics.fator_viagem` / `br.viagem()` — visitante
+  dentro × fora do seu estado.
+- **Inflação de gols**: `analytics.media_gols_por_decada` /
+  `br.gols_por_decada()` (média por década e era de pontuação).
+- **Distribuição de saldos**: `analytics.distribuicao_saldos` +
+  `br.plot_saldos()` (a assimetria é o fator casa).
+- **Mapa coroplético por UF**: `viz.mapa_estados` + `br.plot_mapa_estados()`,
+  com `data.carregar_geojson_estados()` (GeoJSON público, cacheado em disco).
+- **Validação de consistência**: `schema.relatorio_consistencia` /
+  `br.validar()` — placares × resultados × pontos, datas, duplicatas.
+- **Cores de clube**: cauda longa mapeada (120 dos 167 clubes da base).
+- **Galeria de exemplos**: `examples/demo.py` agora gera
+  `galeria_dashgusbr.html` com todos os gráficos e a chamada de cada um.
+- **Guia completo em notebook**: `examples/guia_dashgusbr.ipynb` percorre toda
+  a API — gráficos, análises, personalização, exportação, validação, camadas
+  puras e CLI (todas as células executáveis validadas contra a base real).
+
+### Corrigido
+- `br.partidas(time="gremio")` agora resolve o nome com a mesma tolerância
+  dos demais métodos (antes retornava um filtro vazio silencioso).
+- Cache em disco: `validade_horas=0` podia aceitar o cache mesmo assim quando
+  o mtime do arquivo ficava milissegundos à frente do relógio (granularidade
+  do filesystem no Windows) — causa de um teste intermitente.
+- `analytics.distribuicao_placares` valida o ano antes de filtrar.
+
+## [0.1.1] - 2026-07-22
+
+### Adicionado
 - **Cores oficiais por time** (`cores_times=True` nos plots por time; `cor_time`
   e `cores_para_times` na API pública), com fallback seguro para a paleta padrão
   e desambiguação de cores repetidas no mesmo gráfico.
@@ -36,5 +74,6 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Módulos de apoio `config`, `schema` e tema visual.
 - Suíte de testes (`pytest`) e exemplo de uso em `examples/demo.py`.
 
-[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.0...HEAD
+[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/gustavogasperetti/DashGusBr-lib/releases/tag/v0.1.0

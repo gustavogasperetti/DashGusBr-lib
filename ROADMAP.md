@@ -1,12 +1,9 @@
-# Roadmap de melhorias — dashgusbr
-
-Lista viva de melhorias possíveis para a biblioteca, agrupadas por tema.
-Cada item traz **o quê**, **por quê** e um **esboço de como** implementar.
+# Roadmap — dashgusbr
 
 > **Legenda**
 > Prioridade: 🔴 alta · 🟡 média · 🟢 baixa
 > Esforço: ⚡ pequeno · ⚙️ médio · 🏗️ grande
-> Status: `[ ]` não iniciado · `[~]` em andamento · `[x]` concluído
+> Status: `[ ]` não iniciado · `[~]` em andamento · `[x]` concluído · `[!]` bloqueado
 
 Colunas disponíveis na OBT (base para novas contas):
 `id_partida, ano_campeonato, data, mandante, visitante, estado_mandante,
@@ -17,183 +14,141 @@ pontos_mandante, pontos_visitante`.
 
 ---
 
-## 1. Cores oficiais por time 🎨
+## Roadmap v1 — CONCLUÍDO ✅
 
-Cada time passa a ter uma **cor principal** própria (ex.: Palmeiras → verde,
-Flamengo → vermelho, Cruzeiro → azul), usada por padrão nos gráficos que
-representam times individuais.
+Fechado em jul/2026. Estado final de cada tema:
 
-- [x] 🔴 ⚙️ **Mapa de cores por time** — novo módulo `_cores_times.py` com um
-  dicionário `nome canônico → cor principal (hex)` e, opcionalmente, cor
-  secundária. Função `cor_time(nome) -> str` com:
-  - normalização robusta (sem acento, caixa baixa, espaços) para casar
-    "São Paulo"/"sao paulo"/"SÃO PAULO";
-  - **aliases** ("Athletico-PR", "Atlético-PR", "CAP"; "Atlético-MG", "Galo"…);
-  - **fallback** para a paleta categórica atual quando o time não estiver no
-    mapa (nunca quebrar).
+### 1. Cores oficiais por time 🎨
+- [x] Mapa de cores (`_cores_times.py`), normalização robusta, aliases e fallback.
+- [x] `usar_cores_times=True` nos plots por time; `cores_times=` na fachada.
+- [x] API pública: `from dashgusbr import cor_time`.
+- [x] **Contraste/legibilidade** — `cor_texto_para` (luminância WCAG) aplica cor
+  de texto automática a rótulos que caem dentro de barras escuras.
+- [x] Acessibilidade documentada (recurso opt-in; cores duplicadas caem na
+  paleta categórica validada).
+- [x] **Cobertura** — 120 dos 167 clubes da base mapeados. Os 47 restantes são
+  clubes extintos/regionais cuja cor histórica não é verificável com
+  confiança; ficam no fallback seguro (item de pesquisa segue no v2).
 
-  ```python
-  # esboço de src/dashgusbr/_cores_times.py
-  CORES_TIMES = {
-      "palmeiras":     "#006437",  # verde
-      "flamengo":      "#c52613",  # vermelho
-      "corinthians":   "#111111",  # preto
-      "sao paulo":     "#c8102e",  # vermelho
-      "gremio":        "#0d80bf",  # azul
-      "internacional": "#c40000",  # vermelho
-      "cruzeiro":      "#1e3a8a",  # azul
-      "atletico-mg":   "#111111",  # preto
-      "vasco da gama": "#111111",  # preto
-      "santos":        "#111111",  # preto/branco
-      "fluminense":    "#7a1f2b",  # grená
-      "botafogo":      "#111111",  # preto
-      "bahia":         "#1f6fd6",  # azul
-      "fortaleza":     "#1f4fa0",  # azul
-      # ... completar com os demais times da base (br.times())
-  }
-  ```
+### 2. Personalização dos gráficos 🛠️
+- [x] `titulo=`, `**layout_kwargs` e `cores=` em todos os `viz.*`/`plot_*`.
+- [x] Tema via `template=` em qualquer gráfico.
+- [x] **Tema escuro próprio** — template `dashgusbr_escuro`
+  (`template="dashgusbr_escuro"`).
+- [x] **Controle de rótulos/legenda** — `mostrar_valores=` e `mostrar_legenda=`.
 
-- [x] 🔴 ⚡ **Usar as cores nos plots por time** — em `viz.evolucao`,
-  `viz.historico` e `viz.confronto`, quando `usar_cores_times=True`, pintar
-  cada série com `cor_time(...)`. Manter o comportamento atual como padrão
-  (`False`) para não quebrar nada.
-- [x] 🟡 ⚡ **Expor no `Brasileirao`** — parâmetro `cores_times: bool = False`
-  em `plot_evolucao`, `plot_historico`, `plot_confronto` (+ `plot_corrida_titulo`).
-- [x] 🟡 ⚡ **API pública da cor** — expor `from dashgusbr import cor_time` para
-  o usuário reaproveitar as cores em gráficos próprios.
-- [ ] 🟢 ⚡ **Contraste/legibilidade** — amarelos já escurecidos no mapa; falta
-  cor de texto automática por luminância para rótulos sobre barras escuras.
-- [x] 🟢 ⚡ **Acessibilidade** — cores de time **não** são seguras para
-  daltonismo (dois times pretos, dois azuis). `cores_times` é **opt-in**,
-  cores duplicadas no mesmo gráfico caem na paleta categórica; documentado.
-- [ ] 🟢 ⚙️ **Cobertura completa e testes** — ~55 clubes mapeados (todos com
-  presença relevante); falta mapear a cauda longa dos 167 times históricos.
+### 3. Experiência do usuário / desenvolvedor 👤
+- [x] Cache em disco, logging, retry/backoff, exportação (`salvar_html`,
+  `salvar_imagem`), busca tolerante de time, `resumo_time`, `py.typed`.
+- [x] **CLI** — `python -m dashgusbr tabela 2023` (+ `goleadas`, `ranking`,
+  `resumo`, `times`, `anos`, `validar`; opções `--fonte` e `--html`).
+- [~] Docstrings com exemplos — assinaturas documentadas e galeria como
+  referência rápida; página de referência gerada fica para o v2 (docs site).
 
----
+### 4. Novos gráficos e novas análises 📊
+- [x] Corrida pelo título, casa × fora, sequências, forma recente, ranking
+  histórico, líderes por temporada, retrospecto por adversário, clássicos,
+  estados, fases.
+- [x] **Linha do tempo do confronto** — `analytics.evolucao_confronto` +
+  `br.plot_confronto_evolucao(a, b)` (saldo acumulado na história).
+- [x] **Mapa coroplético por UF** — `viz.mapa_estados` + `br.plot_mapa_estados()`;
+  GeoJSON público baixado e cacheado por `data.carregar_geojson_estados()`.
+- [x] **Fator "viagem"** — `analytics.fator_viagem` / `br.viagem()`.
+- [x] **Inflação/deflação de gols** — `analytics.media_gols_por_decada` /
+  `br.gols_por_decada()` (média por década e por era de pontuação).
+- [x] **Distribuição de saldos** — `analytics.distribuicao_saldos` +
+  `br.plot_saldos()`.
 
-## 2. Personalização dos gráficos 🛠️
+### 5. Dados e infraestrutura 🗄️
+- [x] **Validação de dados mais rica** — `schema.relatorio_consistencia` /
+  `br.validar()`: gols ≥ 0, resultado × placar, espelhamento dos dois lados,
+  pontos × resultado, `total_gols`, datas plausíveis, `id_partida` duplicado.
+- [x] Snapshot local (`Brasileirao(fonte="obt.csv")`), retry/timeout.
+- [!] **Número de rodada** — bloqueado: depende do ETL (Infra-Brasileirao)
+  publicar a coluna. Quando existir, `evolucao_pontos` troca a ordem por data
+  pela rodada oficial. → v2, tema "contrato com o ETL".
 
-Hoje os métodos `plot_*` retornam um `Figure` mutável (dá para ajustar tudo
-depois), mas a API da lib quase não aceita customização na chamada.
-
-- [x] 🔴 ⚡ **`titulo=` nos métodos `plot_*`** — permitir sobrescrever o título
-  fixo (ex.: `br.plot_tabela(2023, titulo="Meu título")`).
-- [x] 🔴 ⚙️ **Passar `**layout_kwargs`** para as funções `viz.*` e métodos
-  `plot_*`, repassados a `fig.update_layout(...)` (largura, altura, fonte,
-  fundo, etc.) sem o usuário precisar pós-processar.
-- [x] 🟡 ⚙️ **Paleta customizável** — aceitar `cores=[...]` nas funções `viz.*`
-  em vez de constantes cravadas no traço; hoje trocar a paleta exige
-  `fig.update_traces(...)`.
-- [x] 🟡 ⚡ **Escolher tema** — via `layout_kwargs`: `template="plotly_dark"`
-  funciona em qualquer `plot_*`/`viz.*` (documentado no README).
-- [ ] 🟢 ⚙️ **Tema escuro** — variante dark do template em `_theme.py`
-  (`registrar_tema(modo="dark")`).
-- [ ] 🟢 ⚡ **Controle de rótulos/hover** — flags como `mostrar_valores`,
-  `mostrar_legenda`, `hover=...` para ligar/desligar detalhes.
+### 6. Qualidade, testes e documentação ✅
+- [x] 118 testes offline + 2 smoke de rede; lint (`ruff`) no CI.
+- [x] **Galeria de exemplos** — `examples/demo.py` gera
+  `galeria_dashgusbr.html` com todos os gráficos e a chamada de cada um.
+- [ ] Documentação publicada (site) — movido para o v2 como item principal.
 
 ---
 
-## 3. Experiência do usuário / desenvolvedor 👤
+## Roadmap v2 — PROPOSTA 🚀
 
-- [x] 🔴 ⚙️ **Cache em disco** — CSV baixado fica em `~/.dashgusbr/cache` com
-  validade configurável (`validade_horas`); fallback para a cópia local quando
-  a rede está fora; `limpar_cache(disco=True)`.
-- [x] 🔴 ⚡ **Logging** no download da OBT (logger `dashgusbr`: download,
-  tentativas, cache usado, fallback) + retry com backoff e timeout.
-- [x] 🟡 ⚙️ **Exportação facilitada** — helpers `salvar_html(fig, caminho)` e
-  `salvar_imagem(fig, caminho)` (png/svg via kaleido), com kaleido em
-  `optional-dependencies` (`pip install dashgusbr[imagem]`).
-- [x] 🟡 ⚡ **Busca de time tolerante** — nomes resolvem ignorando
-  caixa/acento/hífen ("gremio" → "Grêmio"); aproximação vaga continua sendo
-  erro com sugestões (nunca palpite silencioso).
-- [x] 🟡 ⚙️ **`resumo_time(time)`** — um dict/tabela com o "cartão" do clube
-  (temporadas disputadas, melhor/pior campanha, aproveitamento médio,
-  maior goleada a favor/contra).
-- [ ] 🟢 ⚙️ **CLI** — `python -m dashgusbr tabela 2023` para gerar tabela/gráfico
-  pelo terminal.
-- [x] 🟢 ⚙️ **`py.typed`** — marcador publicado; hints já cobrem as assinaturas
-  públicas (checagem estática estrita fica para depois).
-- [ ] 🟢 ⚡ **Docstrings com exemplos executáveis** e página de referência.
+Com a base analítica madura, o v2 muda o foco: **publicar** (docs, PyPI),
+**aprofundar** (análises que contam histórias, não só agregam) e **endurecer o
+contrato de dados** com o ETL.
 
----
+### 1. Documentação e alcance 📚
+- [ ] 🔴 ⚙️ **Site de documentação** — MkDocs Material + mkdocstrings,
+  publicado no GitHub Pages por CI: API de referência gerada das docstrings,
+  tutorial "do zero ao gráfico" e a galeria hospedada como página.
+- [ ] 🔴 ⚡ **Doctests no CI** — transformar os `Examples` das docstrings em
+  testes executáveis (`pytest --doctest-modules` sobre funções puras).
+- [ ] 🟡 ⚡ **Galeria como artefato de CI** — regenerar `galeria_dashgusbr.html`
+  no workflow (marker `rede`) e anexar ao release; a galeria nunca desatualiza.
+- [ ] 🟢 ⚙️ **README bilíngue** — versão curta em inglês para a página do PyPI.
 
-## 4. Novos gráficos e novas análises 📊
+### 2. Contrato de dados com o ETL 🤝
+- [ ] 🔴 ⚡ **Issue no Infra-Brasileirao: coluna `rodada`** — destrava a
+  evolução por rodada oficial, tabelas "na rodada X" e análises de recorte
+  (ver 3.2). Do lado da lib: usar a coluna quando presente, manter a ordem
+  por data como fallback.
+- [ ] 🟡 ⚙️ **Versão do schema na OBT** — combinar com o ETL um manifesto
+  (versão + data de geração); a lib loga divergências e o CI roda um teste de
+  contrato semanal (cron) contra a OBT real.
+- [ ] 🟡 ⚡ **`br.validar()` no pipeline** — o ETL passa a rodar o relatório de
+  consistência antes de publicar (a lib já exporta a checagem; falta o hook lá).
+- [ ] 🟢 ⚙️ **Snapshot congelado versionado** — publicar um parquet comprimido
+  por release para exemplos/notebooks 100% reprodutíveis offline.
 
-Novas contas aproveitando colunas ainda subutilizadas (`estado_*`,
-`is_mata_mata`, `is_classico_estadual`, `fase`, `saldo_gols_*`).
+### 3. Análises que contam histórias 📖
+- [ ] 🟡 🏗️ **Rating Elo histórico** — força relativa dos clubes jogo a jogo
+  desde 1971 (`analytics.elo` + `br.plot_elo(["Flamengo", "Palmeiras"])`);
+  é a métrica que compara eras melhor que pontos ou aproveitamento.
+- [ ] 🟡 ⚙️ **Comparador de campanhas** — sobrepor a evolução de pontos de
+  campanhas de anos diferentes (`br.plot_comparar_campanhas([("Palmeiras", 2023),
+  ("Flamengo", 2019)])`) normalizando pelo nº de jogos.
+- [ ] 🟡 ⚙️ **Quantos pontos dão o quê** — distribuição histórica de pontos do
+  campeão, do G4 e do Z4 na era dos 20 clubes; responde "68 pontos dá título?".
+- [ ] 🟢 ⚙️ **Painel de eras** — um `br.plot_eras()` comparando as fases do
+  campeonato (2 pts × 3 pts, nº de clubes, mata-mata × pontos corridos) em
+  small multiples.
+- [ ] 🟢 ⚙️ **Zebras e favoritismo** — com o Elo pronto: frequência de upsets,
+  maiores zebras da história.
+- [ ] 🟢 ⚡ **Cauda de cores restante** — pesquisar a identidade visual dos 47
+  clubes ainda no fallback (fontes: escudos históricos, federações estaduais).
 
-### 4.1 Times e temporadas
-- [x] 🔴 ⚙️ **Corrida pelo título** — `analytics.corrida_titulo` +
-  `br.plot_corrida_titulo(ano, n=4, cores_times=True)`.
-- [x] 🟡 ⚙️ **Desempenho casa × fora por time** — `analytics.casa_fora` +
-  `br.plot_casa_fora` (V/E/D agrupados + aproveitamento por local).
-- [x] 🟡 ⚙️ **Sequências (streaks)** — `analytics.sequencias`: maiores
-  sequências de vitórias, invencibilidade, derrotas e jejum (com período).
-- [x] 🟡 ⚙️ **Forma recente** — `analytics.forma_recente` / `br.forma(time, n)`:
-  últimos N jogos + aproveitamento do período em `attrs`.
-- [x] 🟢 ⚙️ **Ranking histórico geral** — `analytics.ranking_historico` /
-  `br.ranking()`: tabela all-time com aproveitamento normalizado entre eras.
-- [x] 🟢 ⚙️ **Líderes por temporada** — `analytics.lideres_temporada` +
-  `br.plot_lideres()` (ressalva documentada: líder ≠ campeão até 2002, a base
-  não decide o mata-mata final).
+### 4. Da biblioteca ao produto 📱
+- [ ] 🟡 🏗️ **App pronto** — `dashgusbr[app]` instala um dashboard Streamlit
+  (`python -m dashgusbr app`): seletor de temporada/clube, todos os gráficos.
+  A arquitetura em camadas puras já foi desenhada para isso.
+- [ ] 🟢 ⚙️ **Animação da corrida do título** — frames por rodada (depende da
+  coluna `rodada`) no `plot_corrida_titulo(animado=True)`.
+- [ ] 🟢 ⚡ **Presets de exportação** — `salvar_imagem(fig, preset="twitter")`
+  (dimensões/escala prontas para redes e slides).
 
-### 4.2 Confrontos e clássicos
-- [x] 🟡 ⚙️ **Retrospecto contra cada adversário** — `analytics.desempenho_contra`
-  + `br.plot_contra(time, top=15)` (aproveitamento, V/E/D, saldo por rival).
-- [x] 🟡 ⚙️ **Análise de clássicos** — `analytics.comparar_classicos` /
-  `br.classicos()`: clássicos × demais jogos (gols, empates, fator casa).
-- [ ] 🟢 ⚙️ **Linha do tempo de um confronto** — saldo acumulado do confronto
-  direto ao longo dos anos (quem "abriu vantagem" na história).
+### 5. Qualidade contínua 🧪
+- [ ] 🟡 ⚡ **Cobertura no CI** — `pytest-cov` com relatório e badge no README.
+- [ ] 🟡 ⚙️ **mypy estrito** — a base já publica `py.typed`; falta fechar os
+  hints internos e ligar `mypy --strict` no CI.
+- [ ] 🟢 ⚡ **Validação de contraste da paleta no CI** — teste automático de
+  que os slots categóricos seguem seguros (deltas de luminância/matiz), para
+  ninguém quebrar a acessibilidade num ajuste de cor.
+- [ ] 🟢 ⚙️ **Benchmark leve** — `lideres_temporada`/`ranking_historico`
+  recalculam a classificação ano a ano; medir e, se necessário, cachear o
+  formato longo por instância.
 
-### 4.3 Geografia (colunas `estado_mandante` / `estado_visitante`)
-- [x] 🟡 ⚙️ **Distribuição por estado/UF** — `analytics.estatisticas_estados` +
-  `br.plot_estados()` (jogos, gols, clubes e fator casa por UF).
-- [ ] 🟢 🏗️ **Mapa coroplético** — intensidade por UF (participações, gols,
-  títulos). Requer geojson dos estados.
-- [ ] 🟢 ⚙️ **Fator "viagem"** — desempenho do visitante quando joga fora do seu
-  estado vs. dentro (proxy de distância).
+### Ordem de ataque sugerida
 
-### 4.4 Campeonato (visão macro)
-- [x] 🟡 ⚙️ **Fases e mata-mata** — `analytics.comparar_fases` / `br.fases()`:
-  gols, empates e fator casa em mata-mata × fase de pontos.
-- [ ] 🟢 ⚙️ **Inflação/deflação de gols** — média de gols por época/formato,
-  destacando mudanças de regulamento.
-- [ ] 🟢 ⚙️ **Distribuição de saldos** — histograma de saldo de gols por jogo.
-
----
-
-## 5. Dados e infraestrutura 🗄️
-
-- [ ] 🟡 ⚙️ **Validação de dados mais rica** — checagens de consistência
-  (gols ≥ 0, resultados coerentes com o placar, datas plausíveis) com relatório.
-- [x] 🟡 ⚡ **Congelar/anexar snapshot** — `Brasileirao(fonte="caminho/obt.csv")`
-  já aceita CSV local no mesmo schema (reprodutibilidade de exemplos/testes).
-- [ ] 🟢 ⚙️ **Suporte a número de rodada** — se o ETL passar a publicar a rodada,
-  usar em `evolucao_pontos` no lugar da ordem por data.
-- [x] 🟢 ⚡ **Retry/timeout no download** — 3 tentativas com backoff e timeout
-  de 30s na carga remota.
-
----
-
-## 6. Qualidade, testes e documentação ✅
-
-- [x] 🔴 ⚡ **Testes das novas features** — cores por time, novos plots, novos
-  parâmetros de customização, cache em disco e exportação (95 testes).
-- [x] 🟡 ⚡ **Lint no CI** — `ruff check` como etapa do workflow de CI.
-- [ ] 🟡 ⚙️ **Galeria de exemplos** — notebook/HTML mostrando cada gráfico
-  (evoluir o `examples/demo.py`).
-- [ ] 🟢 ⚙️ **Documentação publicada** — site (MkDocs/Sphinx) com API e tutoriais.
-- [x] 🟢 ⚡ **Seção "Como personalizar" no README** — exemplos de `update_layout`,
-  `update_traces`, exportação e cores por time.
-
----
-
-### Sugestão de ordem de ataque
-
-~~1–3 concluídos~~ (cores por time, personalização, novas análises, cache em
-disco e exportação). Próximos candidatos, conforme interesse:
-
-1. **Galeria de exemplos** (seção 6) — mostrar os novos gráficos.
-2. **Mapa coroplético por UF** (seção 4.3) e **linha do tempo do confronto**
-   (seção 4.2).
-3. **Tema escuro** próprio e **CLI** (seções 2 e 3).
+1. **Docs site + doctests** (1) — o maior retorno por esforço: torna o que já
+   existe visível e confiável.
+2. **Issue da rodada + teste de contrato** (2) — destrava metade das análises
+   novas e protege a lib de mudanças silenciosas na OBT.
+3. **Elo histórico** (3) — a análise mais diferenciada do v2; puxa zebras e
+   favoritismo de graça.
+4. **App Streamlit** (4) — quando docs e análises estiverem estáveis, é a
+   vitrine natural do projeto.

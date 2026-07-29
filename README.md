@@ -50,18 +50,37 @@ Mais análises prontas:
 br.plot_corrida_titulo(2023, n=4).show()   # evolução dos 4 primeiros colocados
 br.plot_casa_fora("Grêmio").show()         # V/E/D como mandante × visitante
 br.plot_contra("Palmeiras").show()         # aproveitamento contra cada adversário
+br.plot_confronto_evolucao("Grêmio", "Internacional").show()  # saldo do confronto na história
 br.plot_estados().show()                   # jogos por estado (UF)
+br.plot_mapa_estados().show()              # mapa coroplético do Brasil por UF
+br.plot_saldos().show()                    # distribuição do saldo de gols por jogo
 br.plot_lideres().show()                   # vezes que cada clube liderou os pontos corridos
 br.sequencias("Flamengo")                  # DataFrame: maiores sequências (vitórias, invencibilidade...)
 br.forma("Botafogo", n=5)                  # DataFrame: os últimos 5 jogos
 br.resumo("Cruzeiro")                      # dict: cartão-resumo do clube (campanhas, recordes)
 br.ranking()                               # DataFrame: tabela histórica geral
 br.classicos(); br.fases()                 # clássicos × demais jogos; mata-mata × pontos corridos
+br.viagem(); br.gols_por_decada()          # fator viagem do visitante; média de gols por década
+br.validar()                               # relatório de consistência dos dados
+```
+
+Pelo terminal, sem escrever Python:
+
+```bash
+python -m dashgusbr tabela 2023            # classificação no terminal
+python -m dashgusbr tabela 2023 --html t.html
+python -m dashgusbr goleadas 10
+python -m dashgusbr resumo Cruzeiro
+python -m dashgusbr validar               # checagens de consistência da OBT
 ```
 
 Métodos utilitários: `br.anos()`, `br.times(ano=2023)`, `br.partidas(ano=2023, time="Grêmio")`,
 `br.recarregar()` (força novo download). Nomes de time aceitam variações de caixa e acento
 (`"gremio"` resolve para `"Grêmio"`).
+
+> 📓 **Guia completo**: o notebook [`examples/guia_dashgusbr.ipynb`](examples/guia_dashgusbr.ipynb)
+> percorre **tudo** que a biblioteca faz — todos os gráficos, análises, combinações de
+> personalização, exportação, validação de dados, camadas puras e CLI.
 
 ## Como personalizar os gráficos
 
@@ -71,14 +90,18 @@ qualquer ajuste do Plotly funciona depois:
 
 ```python
 fig = br.plot_tabela(2023, titulo="Meu título", width=1000, height=700)
-fig = br.plot_gols_por_temporada(template="plotly_dark")   # troca o tema
+fig = br.plot_tabela(2023, template="dashgusbr_escuro")    # tema escuro da lib
+fig = br.plot_gols_por_temporada(template="plotly_dark")   # ou qualquer tema Plotly
 
 fig.update_traces(marker_color="#ff5722")                  # pós-processamento livre
 fig.add_annotation(text="Fonte: OBT Infra-Brasileirao", xref="paper", x=1, y=-0.12)
 ```
 
 Nas funções de `dashgusbr.viz`, o parâmetro `cores=` substitui a paleta padrão
-(`viz.classificacao(tab, cores="#ff5722")`).
+(`viz.classificacao(tab, cores="#ff5722")`); gráficos com rótulos aceitam
+`mostrar_valores=False` e os com legenda, `mostrar_legenda=False`. Rótulos que
+caem dentro de barras recebem cor de texto automática por luminância (legíveis
+sobre barras escuras).
 
 ### Cores oficiais dos clubes
 
@@ -122,9 +145,10 @@ fig = viz.classificacao(tab)                      # DataFrame → plotly Figure
 
 | Camada | Responsabilidade | Principais funções |
 |---|---|---|
-| `dashgusbr.data` | carga, fallback e caches (memória + disco) | `carregar_dados`, `limpar_cache` |
-| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `casa_fora`, `sequencias`, `forma_recente`, `desempenho_contra`, `corrida_titulo`, `lideres_temporada`, `ranking_historico`, `resumo_time`, `estatisticas_temporada`, `estatisticas_estados`, `comparar_classicos`, `comparar_fases`, `distribuicao_placares`, `maiores_goleadas` |
-| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `casa_fora`, `desempenho_contra`, `estados`, `lideres`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares` |
+| `dashgusbr.data` | carga, fallback e caches (memória + disco) | `carregar_dados`, `carregar_geojson_estados`, `limpar_cache` |
+| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `evolucao_confronto`, `casa_fora`, `sequencias`, `forma_recente`, `desempenho_contra`, `corrida_titulo`, `lideres_temporada`, `ranking_historico`, `resumo_time`, `estatisticas_temporada`, `estatisticas_estados`, `fator_viagem`, `media_gols_por_decada`, `comparar_classicos`, `comparar_fases`, `distribuicao_placares`, `distribuicao_saldos`, `maiores_goleadas` |
+| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `evolucao_confronto`, `casa_fora`, `desempenho_contra`, `estados`, `mapa_estados`, `lideres`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares`, `distribuicao_saldos` |
+| `dashgusbr.schema` | schema canônico e qualidade | `normalizar`, `validar`, `relatorio_consistencia` |
 | `dashgusbr.export` | exportação de figuras | `salvar_html`, `salvar_imagem` |
 
 ## Fontes de dados

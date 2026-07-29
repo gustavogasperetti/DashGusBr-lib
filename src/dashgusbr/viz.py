@@ -12,7 +12,11 @@ Toda função aceita:
 - ``titulo=``: sobrescreve o título padrão;
 - ``cores=``: cor única (str) ou lista de cores, substituindo a paleta padrão;
 - ``**layout_kwargs``: repassados a ``fig.update_layout`` por último — servem
-  para ``width``/``height``, ``font``, ``template="plotly_dark"`` etc.
+  para ``width``/``height``, ``font``, ``template="dashgusbr_escuro"`` etc.
+
+Gráficos com rótulos de valor aceitam ``mostrar_valores=False`` e os com
+legenda, ``mostrar_legenda=``; rótulos que caem DENTRO de uma barra recebem
+cor de texto automática por luminância (legíveis sobre barras escuras).
 
 Gráficos por time também aceitam ``usar_cores_times=True`` para pintar cada
 clube com sua cor oficial (:mod:`dashgusbr._cores_times`). O recurso é
@@ -34,6 +38,7 @@ from ._theme import (
     TEMA,
     TINTA_SECUNDARIA,
     VERDE,
+    cor_texto_para,
     escala_sequencial,
     registrar_tema,
 )
@@ -79,13 +84,15 @@ def classificacao(
     tabela: pd.DataFrame,
     titulo: Optional[str] = None,
     cores: Cores = None,
+    mostrar_valores: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras horizontais de pontos da tabela de classificação.
 
     Espera a saída de :func:`dashgusbr.analytics.classificacao`. Série única
     (magnitude) → um matiz só, sem legenda; o detalhe (V/E/D, saldo,
-    aproveitamento) fica no hover.
+    aproveitamento) fica no hover. ``mostrar_valores=False`` esconde os
+    rótulos de pontos.
     """
     dados = tabela.sort_values("posicao", ascending=False)  # 1º no topo do eixo y
     rotulos = dados["posicao"].astype(str) + "º " + dados["time"]
@@ -97,9 +104,10 @@ def classificacao(
             y=rotulos,
             orientation="h",
             marker=dict(color=cor),
-            text=dados["pontos"],
+            text=dados["pontos"] if mostrar_valores else None,
             textposition="outside",
             textfont=dict(color=TINTA_SECUNDARIA, size=12),
+            insidetextfont=dict(color=cor_texto_para(cor)),
             customdata=dados[
                 ["vitorias", "empates", "derrotas", "saldo", "aproveitamento"]
             ],
@@ -134,6 +142,7 @@ def evolucao(
     titulo: Optional[str] = None,
     cores: Cores = None,
     usar_cores_times: bool = False,
+    mostrar_legenda: Optional[bool] = None,
     **layout_kwargs,
 ) -> go.Figure:
     """Linhas de pontos acumulados jogo a jogo (um ou mais times).
@@ -190,7 +199,7 @@ def evolucao(
         title=titulo or "Evolução de pontos na temporada",
         xaxis_title="Jogo",
         yaxis_title="Pontos acumulados",
-        showlegend=len(times) > 1,
+        showlegend=mostrar_legenda if mostrar_legenda is not None else len(times) > 1,
         hovermode="x unified",
     )
     return _finalizar(fig, layout_kwargs)
@@ -255,6 +264,7 @@ def confronto(
     titulo: Optional[str] = None,
     cores: Cores = None,
     usar_cores_times: bool = False,
+    mostrar_valores: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras do confronto direto: vitórias de cada time e empates.
@@ -278,9 +288,10 @@ def confronto(
             x=categorias,
             y=valores,
             marker=dict(color=paleta),
-            text=valores,
+            text=valores if mostrar_valores else None,
             textposition="outside",
             textfont=dict(color=TINTA_SECUNDARIA, size=13),
+            insidetextfont=dict(color=[cor_texto_para(c) for c in paleta]),
             hovertemplate="%{x}: %{y} jogos<extra></extra>",
         )
     )
@@ -314,6 +325,7 @@ def desempenho_contra(
     top: int = 15,
     titulo: Optional[str] = None,
     cores: Cores = None,
+    mostrar_valores: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras horizontais do aproveitamento de um time contra cada adversário.
@@ -332,9 +344,12 @@ def desempenho_contra(
             y=dados["adversario"],
             orientation="h",
             marker=dict(color=cor),
-            text=dados["aproveitamento"].map(lambda v: f"{v}%"),
+            text=dados["aproveitamento"].map(lambda v: f"{v}%")
+            if mostrar_valores
+            else None,
             textposition="outside",
             textfont=dict(color=TINTA_SECUNDARIA, size=12),
+            insidetextfont=dict(color=cor_texto_para(cor)),
             customdata=dados[["jogos", "vitorias", "empates", "derrotas", "saldo"]],
             hovertemplate=(
                 "<b>vs %{y}</b><br>"
@@ -366,6 +381,8 @@ def casa_fora(
     resumo: pd.DataFrame,
     titulo: Optional[str] = None,
     cores: Cores = None,
+    mostrar_valores: bool = True,
+    mostrar_legenda: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras agrupadas de V/E/D como mandante e como visitante.
@@ -388,9 +405,12 @@ def casa_fora(
                 y=[dados.loc[loc, coluna] for loc in locais],
                 name=nome,
                 marker=dict(color=cor),
-                text=[dados.loc[loc, coluna] for loc in locais],
+                text=[dados.loc[loc, coluna] for loc in locais]
+                if mostrar_valores
+                else None,
                 textposition="outside",
                 textfont=dict(color=TINTA_SECUNDARIA, size=12),
+                insidetextfont=dict(color=cor_texto_para(cor)),
                 hovertemplate=f"{nome}: %{{y}} jogos<extra>%{{x}}</extra>",
             )
         )
@@ -401,6 +421,7 @@ def casa_fora(
         xaxis=dict(showgrid=False),
         barmode="group",
         bargap=0.3,
+        showlegend=mostrar_legenda,
     )
     for loc, rotulo in zip(locais, rotulos):
         fig.add_annotation(
@@ -459,6 +480,7 @@ def mandante_visitante(
     estatisticas: pd.DataFrame,
     titulo: Optional[str] = None,
     cores: Cores = None,
+    mostrar_legenda: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Linhas do fator casa: % de vitórias do mandante, empates e do visitante.
@@ -492,6 +514,7 @@ def mandante_visitante(
         yaxis_title="% dos jogos",
         yaxis=dict(range=[0, 100], ticksuffix="%"),
         hovermode="x unified",
+        showlegend=mostrar_legenda,
     )
     return _finalizar(fig, layout_kwargs)
 
@@ -580,6 +603,7 @@ def lideres(
     top: int = 15,
     titulo: Optional[str] = None,
     cores: Cores = None,
+    mostrar_valores: bool = True,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras de quantas vezes cada clube terminou líder dos pontos corridos.
@@ -596,9 +620,10 @@ def lideres(
             y=dados["time"],
             orientation="h",
             marker=dict(color=cor),
-            text=dados["lideracas"],
+            text=dados["lideracas"] if mostrar_valores else None,
             textposition="outside",
             textfont=dict(color=TINTA_SECUNDARIA, size=12),
+            insidetextfont=dict(color=cor_texto_para(cor)),
             customdata=dados[["anos"]],
             hovertemplate=(
                 "<b>%{y}</b>: %{x} vez(es) líder<br>%{customdata[0]}"
@@ -614,5 +639,141 @@ def lideres(
         showlegend=False,
         bargap=0.35,
         height=max(360, 96 + 24 * len(dados)),
+    )
+    return _finalizar(fig, layout_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Confronto no tempo, saldos e mapa
+# ---------------------------------------------------------------------------
+
+
+def evolucao_confronto(
+    linha_tempo: pd.DataFrame,
+    titulo: Optional[str] = None,
+    cores: Cores = None,
+    usar_cores_times: bool = False,
+    **layout_kwargs,
+) -> go.Figure:
+    """Linha do saldo acumulado de um confronto direto ao longo dos anos.
+
+    Espera a saída de :func:`dashgusbr.analytics.evolucao_confronto`. Saldo
+    positivo = vantagem do ``time_a``; a linha do zero é o equilíbrio. Uma
+    série só → a cor identifica o time de referência.
+    """
+    time_a = linha_tempo.attrs.get("time_a", "Time A")
+    time_b = linha_tempo.attrs.get("time_b", "Time B")
+    padrao = cores_para_times([time_a]) if usar_cores_times else [AZUL]
+    (cor,) = _como_lista(cores, 1, padrao)
+
+    fig = go.Figure(
+        go.Scatter(
+            x=linha_tempo["data"],
+            y=linha_tempo["saldo_acumulado"],
+            mode="lines",
+            line=dict(color=cor, width=2, shape="hv"),
+            customdata=linha_tempo[["mandante", "placar", "visitante"]],
+            hovertemplate=(
+                "%{x|%d/%m/%Y}<br>"
+                "%{customdata[0]} %{customdata[1]} %{customdata[2]}<br>"
+                f"Saldo de {time_a}: %{{y}}<extra></extra>"
+            ),
+        )
+    )
+    fig.add_hline(y=0, line=dict(color=CINZA_NEUTRO, width=1, dash="dot"))
+    fig.update_layout(
+        template=TEMA,
+        title=titulo or f"{time_a} x {time_b} — saldo do confronto na história",
+        xaxis_title="Ano",
+        yaxis_title=f"Saldo de vitórias de {time_a}",
+        showlegend=False,
+    )
+    return _finalizar(fig, layout_kwargs)
+
+
+def distribuicao_saldos(
+    contagem: pd.DataFrame,
+    titulo: Optional[str] = None,
+    cores: Cores = None,
+    mostrar_valores: bool = False,
+    **layout_kwargs,
+) -> go.Figure:
+    """Histograma do saldo de gols por jogo (mandante − visitante).
+
+    Espera a saída de :func:`dashgusbr.analytics.distribuicao_saldos`. A
+    assimetria para a direita é o fator casa; o zero (empates) usa o cinza
+    neutro, sem lado.
+    """
+    (cor,) = _como_lista(cores, 1, [AZUL])
+    paleta = [CINZA_NEUTRO if s == 0 else cor for s in contagem["saldo"]]
+    maximo = int(contagem["saldo"].max())
+    rotulos = [
+        f"{s:+d}" if abs(s) < maximo else f"{s:+d}{'+' if s > 0 else ''}"
+        for s in contagem["saldo"]
+    ]
+
+    fig = go.Figure(
+        go.Bar(
+            x=rotulos,
+            y=contagem["jogos"],
+            marker=dict(color=paleta),
+            text=contagem["jogos"] if mostrar_valores else None,
+            textposition="outside",
+            textfont=dict(color=TINTA_SECUNDARIA, size=11),
+            insidetextfont=dict(color=[cor_texto_para(c) for c in paleta]),
+            hovertemplate="Saldo %{x}: %{y} jogos<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        template=TEMA,
+        title=titulo or "Distribuição do saldo de gols por jogo",
+        xaxis=dict(title="Saldo do mandante (gols)", showgrid=False),
+        yaxis_title="Jogos",
+        showlegend=False,
+        bargap=0.2,
+    )
+    return _finalizar(fig, layout_kwargs)
+
+
+def mapa_estados(
+    stats: pd.DataFrame,
+    geojson: dict,
+    metrica: str = "jogos",
+    titulo: Optional[str] = None,
+    **layout_kwargs,
+) -> go.Figure:
+    """Mapa coroplético do Brasil com uma métrica por UF.
+
+    Espera a saída de :func:`dashgusbr.analytics.estatisticas_estados` e um
+    GeoJSON dos estados cujas features tenham a sigla da UF em
+    ``properties.sigla`` (use :func:`dashgusbr.data.carregar_geojson_estados`).
+    Magnitude → rampa sequencial de um matiz.
+    """
+    if metrica not in stats.columns:
+        raise ValueError(f"Métrica {metrica!r} não existe nas estatísticas por UF.")
+
+    fig = go.Figure(
+        go.Choropleth(
+            geojson=geojson,
+            featureidkey="properties.sigla",
+            locations=stats["estado"],
+            z=stats[metrica],
+            colorscale=escala_sequencial(),
+            marker=dict(line=dict(color="#ffffff", width=0.5)),
+            colorbar=dict(title=metrica.replace("_", " ").capitalize(), outlinewidth=0),
+            customdata=stats[["jogos", "gols", "times"]],
+            hovertemplate=(
+                "<b>%{location}</b><br>"
+                f"{metrica}: %{{z}}<br>"
+                "%{customdata[0]} jogos · %{customdata[1]} gols · "
+                "%{customdata[2]} clubes<extra></extra>"
+            ),
+        )
+    )
+    fig.update_geos(fitbounds="locations", visible=False)
+    fig.update_layout(
+        template=TEMA,
+        title=titulo or f"Brasileirão por estado — {metrica.replace('_', ' ')}",
+        height=560,
     )
     return _finalizar(fig, layout_kwargs)

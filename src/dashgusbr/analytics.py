@@ -309,6 +309,48 @@ def confronto(df: pd.DataFrame, time_a: str, time_b: str) -> dict:
     }
 
 
+def evolucao_confronto(df: pd.DataFrame, time_a: str, time_b: str) -> pd.DataFrame:
+    """Linha do tempo do confronto direto: saldo acumulado ao longo dos anos.
+
+    Uma linha por jogo, na perspectiva de ``time_a``: saldo do jogo
+    (+1 vitória, 0 empate, -1 derrota) e ``saldo_acumulado`` — quem "abriu
+    vantagem" na história fica visível pelo sinal. Os nomes resolvidos ficam
+    em ``attrs['time_a']``/``attrs['time_b']``.
+    """
+    resumo = confronto(df, time_a, time_b)
+    partidas = resumo["partidas"]
+    if partidas.empty:
+        raise ValueError(
+            f"{resumo['time_a']!r} x {resumo['time_b']!r} nunca se enfrentaram na base."
+        )
+
+    a_mandante = partidas["mandante"] == resumo["time_a"]
+    resultado_a = partidas["resultado_mandante"].where(
+        a_mandante, partidas["resultado_visitante"]
+    )
+    saldo_jogo = resultado_a.map({"V": 1, "E": 0, "D": -1}).astype(int)
+
+    linha = pd.DataFrame(
+        {
+            "data": partidas["data"],
+            "ano_campeonato": partidas["ano_campeonato"],
+            "mandante": partidas["mandante"],
+            "visitante": partidas["visitante"],
+            "placar": (
+                partidas["gols_mandante"].astype(int).astype(str)
+                + " x "
+                + partidas["gols_visitante"].astype(int).astype(str)
+            ),
+            "resultado_a": resultado_a,
+            "saldo_jogo": saldo_jogo,
+            "saldo_acumulado": saldo_jogo.cumsum(),
+        }
+    ).reset_index(drop=True)
+    linha.attrs["time_a"] = resumo["time_a"]
+    linha.attrs["time_b"] = resumo["time_b"]
+    return linha
+
+
 # ---------------------------------------------------------------------------
 # Estatísticas agregadas do campeonato
 # ---------------------------------------------------------------------------
@@ -365,9 +407,9 @@ def distribuicao_placares(
     bin para a matriz não explodir por causa de goleadas raras. Índice =
     gols do mandante, colunas = gols do visitante, valores = nº de jogos.
     """
-    jogos = _com_placar(df if ano is None else df[df["ano_campeonato"] == ano])
     if ano is not None:
         _validar_ano(df, ano)
+    jogos = _com_placar(df if ano is None else df[df["ano_campeonato"] == ano])
     gm = jogos["gols_mandante"].clip(upper=max_gols).astype(int)
     gv = jogos["gols_visitante"].clip(upper=max_gols).astype(int)
     matriz = pd.crosstab(gm, gv)
@@ -799,6 +841,97 @@ def comparar_fases(df: pd.DataFrame) -> pd.DataFrame:
         "is_mata_mata",
         {True: "Mata-mata", False: "Fase de pontos"},
     )
+
+
+def fator_viagem(df: pd.DataFrame) -> pd.DataFrame:
+    """Desempenho do visitante dentro × fora do seu estado (proxy de distância).
+
+    Compara jogos em que mandante e visitante são do mesmo estado (viagem
+    curta) com jogos interestaduais. Colunas: grupo, jogos, media_gols,
+    pct_vitorias_visitante, pct_empates, pct_vitorias_mandante. Considera
+    jogos com placar e com as duas UFs preenchidas.
+    """
+    jogos = _com_placar(df).dropna(
+        subset=["estado_mandante", "estado_visitante"]
+    ).copy()
+    jogos["_mesmo_estado"] = jogos["estado_mandante"] == jogos["estado_visitante"]
+    jogos["_gols_partida"] = jogos["gols_mandante"] + jogos["gols_visitante"]
+    stats = (
+        jogos.groupby("_mesmo_estado")
+        .agg(
+            jogos=("id_partida", "count"),
+            media_gols=("_gols_partida", lambda g: round(float(g.mean()), 2)),
+            pct_vitorias_visitante=(
+                "resultado_visitante",
+                lambda r: round(100 * (r == "V").mean(), 1),
+            ),
+            pct_empates=(
+                "resultado_visitante",
+                lambda r: round(100 * (r == "E").mean(), 1),
+            ),
+            pct_vitorias_mandante=(
+                "resultado_visitante",
+                lambda r: round(100 * (r == "D").mean(), 1),
+            ),
+        )
+        .reset_index()
+    )
+    stats.insert(
+        0,
+        "grupo",
+        stats["_mesmo_estado"].map(
+            {True: "Visitante do mesmo estado", False: "Visitante de outro estado"}
+        ),
+    )
+    return stats.drop(columns=["_mesmo_estado"])
+
+
+def media_gols_por_decada(df: pd.DataFrame) -> pd.DataFrame:
+    """Inflação/deflação de gols: média de gols por jogo em cada década.
+
+    Colunas: decada ("1970", "1980", ...), era_pontuacao ("2 pontos por
+    vitória" até 1994, "3 pontos" a partir de 1995 — a principal mudança de
+    regulamento que incentivou a vitória), jogos, gols, media_gols.
+    """
+    jogos = _com_placar(df).dropna(subset=["ano_campeonato"]).copy()
+    ano = jogos["ano_campeonato"].astype(int)
+    jogos["_decada"] = (ano // 10 * 10).astype(str)
+    jogos["_era"] = (ano >= 1995).map(
+        {False: "2 pontos por vitória", True: "3 pontos por vitória"}
+    )
+    jogos["_gols_partida"] = jogos["gols_mandante"] + jogos["gols_visitante"]
+    stats = (
+        jogos.groupby(["_decada", "_era"])
+        .agg(jogos=("id_partida", "count"), gols=("_gols_partida", "sum"))
+        .reset_index()
+        .rename(columns={"_decada": "decada", "_era": "era_pontuacao"})
+        .sort_values("decada", ignore_index=True)
+    )
+    stats["media_gols"] = (stats["gols"] / stats["jogos"]).astype(float).round(2)
+    return stats
+
+
+def distribuicao_saldos(
+    df: pd.DataFrame, ano: Optional[int] = None, max_saldo: int = 5
+) -> pd.DataFrame:
+    """Distribuição do saldo de gols por jogo (mandante − visitante).
+
+    Uma linha por saldo (−``max_saldo``..+``max_saldo``, extremos agregam as
+    caudas) com o nº de jogos. Saldo positivo = vitória do mandante; a
+    assimetria da distribuição É o fator casa visto pelos placares.
+    """
+    if ano is not None:
+        _validar_ano(df, ano)
+    jogos = _com_placar(df if ano is None else df[df["ano_campeonato"] == ano])
+    saldo = (
+        (jogos["gols_mandante"] - jogos["gols_visitante"])
+        .astype(int)
+        .clip(lower=-max_saldo, upper=max_saldo)
+    )
+    contagem = saldo.value_counts().sort_index()
+    eixo = range(-max_saldo, max_saldo + 1)
+    contagem = contagem.reindex(eixo, fill_value=0)
+    return pd.DataFrame({"saldo": contagem.index, "jogos": contagem.values})
 
 
 def maiores_goleadas(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:

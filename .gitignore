@@ -25,6 +25,9 @@ htmlcov/
 
 # Saídas de exemplo
 demo_brasileirao.html
+galeria_dashgusbr.html
+tabela_2023.html
+examples/*.html
 
 # SO
 Thumbs.db
