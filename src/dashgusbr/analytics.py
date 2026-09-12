@@ -253,6 +253,28 @@ def historico_time(df: pd.DataFrame, time: str) -> pd.DataFrame:
     return historico[colunas].reset_index(drop=True)
 
 
+def ultima_temporada(df: pd.DataFrame, time: Optional[str] = None) -> int:
+    """A temporada mais recente da base — ou a última que o time disputou.
+
+    É o "campeonato atual" na perspectiva dos dados: recortes sem ano
+    explícito (o dashboard, por exemplo) partem daqui em vez de chutar o ano
+    do relógio, que pode não existir na OBT. Considera apenas a fase de
+    pontos corridos, a única com classificação.
+    """
+    base = _pontos_corridos(df)
+    if time is not None:
+        time = _resolver_time(df, time)
+        base = base[(base["mandante"] == time) | (base["visitante"] == time)]
+        if base.empty:
+            raise ValueError(
+                f"{time!r} nunca disputou fases de pontos corridos na base."
+            )
+    anos = base["ano_campeonato"].dropna()
+    if anos.empty:
+        raise ValueError("A base não tem partidas de fase de pontos corridos.")
+    return int(anos.max())
+
+
 # ---------------------------------------------------------------------------
 # Confronto direto
 # ---------------------------------------------------------------------------

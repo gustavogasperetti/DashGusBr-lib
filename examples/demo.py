@@ -29,6 +29,22 @@ def main() -> None:
     # (título da seção, código exibido, figura)
     galeria = [
         (
+            "Dashboard do time (painéis padrão)",
+            f"br.dashboard({a!r}, ano_campeonato={ano})",
+            br.dashboard(a, ano_campeonato=ano),
+        ),
+        (
+            "Dashboard personalizado",
+            f'br.dashboard({a!r}, ano_campeonato={ano}, '
+            'incluir=["sequencias", "placares"], remover=["adversarios"])',
+            br.dashboard(
+                a,
+                ano_campeonato=ano,
+                incluir=["sequencias", "placares"],
+                remover=["adversarios"],
+            ),
+        ),
+        (
             "Classificação",
             f"br.plot_tabela({ano})",
             br.plot_tabela(ano),
@@ -107,7 +123,7 @@ def main() -> None:
 
     try:
         galeria.insert(
-            13,
+            15,
             (
                 "Mapa por estado (coroplético)",
                 "br.plot_mapa_estados()",

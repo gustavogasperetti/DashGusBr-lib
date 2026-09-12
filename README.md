@@ -2,6 +2,10 @@
 
 **Análise e visualização do histórico completo do Campeonato Brasileiro (1971–hoje), em uma linha de Python.**
 
+```python
+Brasileirao().dashboard("Palmeiras").show()   # o painel completo do clube na temporada atual
+```
+
 `dashgusbr` é a camada de consumo e visualização de uma arquitetura serverless desacoplada em dois
 repositórios: o [Infra-Brasileirao](https://github.com/gustavogasperetti/Infra-Brasileirao) roda o
 pipeline ETL agendado (cron) que limpa e consolida todas as partidas do Brasileirão em uma
@@ -12,8 +16,8 @@ dados: a URL da OBT e o schema documentado abaixo.
 
 ```
 ┌─────────────┐      ┌──────────────┐      ┌──────────────────┐      ┌────────────┐
-│ Fontes brutas │ ──▶ │ Pipeline ETL │ ──▶ │ OBT (camada gold) │ ──▶ │ dashgusbr  │
-└─────────────┘      └──────────────┘      │ GitHub / Sheets   │      │ análise+viz│
+│Fontes brutas│ ──▶ │ Pipeline ETL │ ──▶  │ OBT (camada gold)│ ──▶ │ dashgusbr  │
+└─────────────┘      └──────────────┘      │ GitHub / Sheets  │      │ análise+viz│
                                            └──────────────────┘      └────────────┘
 ```
 
@@ -31,6 +35,8 @@ Requer Python ≥ 3.9. Dependências: `pandas` e `plotly`.
 from dashgusbr import Brasileirao
 
 br = Brasileirao()                     # baixa a OBT na primeira consulta e cacheia
+
+br.dashboard("Palmeiras").show()       # dashboard completo do time (campeonato atual)
 
 br.tabela(2023)                        # DataFrame: classificação de 2023
 br.plot_tabela(2023).show()            # gráfico de barras da classificação
@@ -79,8 +85,78 @@ Métodos utilitários: `br.anos()`, `br.times(ano=2023)`, `br.partidas(ano=2023,
 (`"gremio"` resolve para `"Grêmio"`).
 
 > 📓 **Guia completo**: o notebook [`examples/guia_dashgusbr.ipynb`](examples/guia_dashgusbr.ipynb)
-> percorre **tudo** que a biblioteca faz — todos os gráficos, análises, combinações de
-> personalização, exportação, validação de dados, camadas puras e CLI.
+> percorre **tudo** que a biblioteca faz — o dashboard por time (seção 3), todos os gráficos,
+> análises, combinações de personalização, exportação, validação de dados, camadas puras e CLI.
+
+## Dashboard por time
+
+Um comando, um painel inteiro: `br.dashboard("Palmeiras")` devolve **uma única figura Plotly**
+com os gráficos padrão do clube na temporada atual da base.
+
+```python
+br.dashboard("Palmeiras").show()                       # campeonato atual
+br.dashboard("Palmeiras", ano_campeonato=2020).show()  # temporada antiga, mesmos painéis
+br.dashboard("gremio").show()                          # nome tolerante a acento e caixa
+```
+
+Os painéis padrão são sempre os mesmos — é o que faz dois times (ou duas temporadas do mesmo
+time) serem comparáveis de bate-pronto:
+
+| Painel | O que mostra |
+|---|---|
+| `indicadores` | posição, pontos, V/E/D e aproveitamento, com a variação sobre a temporada anterior |
+| `evolucao` | pontos acumulados jogo a jogo na temporada |
+| `casa_fora` | V/E/D como mandante × como visitante |
+| `classificacao` | a tabela da temporada, com o time destacado |
+| `adversarios` | aproveitamento contra cada adversário da temporada |
+| `forma` | pontos jogo a jogo no fim da temporada |
+| `historico` | aproveitamento temporada a temporada, com o ano do recorte marcado |
+
+### Modificando o dashboard
+
+A personalização acontece **em cima** do padrão, sem perdê-lo:
+
+```python
+br.paineis()                           # DataFrame: catálogo de painéis (nome, padrão?, descrição)
+
+br.dashboard("Santos", incluir=["sequencias", "placares"])   # acrescenta do catálogo
+br.dashboard("Santos", remover=["adversarios"])              # tira do padrão
+br.dashboard("Santos", paineis=["evolucao", "classificacao"]) # define a lista inteira
+br.dashboard("Santos", colunas=3, altura_linha=300)          # grade e altura
+br.dashboard("Santos", cores_times=True, template="dashgusbr_escuro")
+```
+
+Além dos painéis do catálogo (`posicao`, `sequencias`, `placares`, `saldos`,
+`adversarios_historico`), `incluir=` aceita **gráficos seus** — uma figura pronta ou uma função
+que recebe o contexto do recorte (base, time já resolvido, temporada e os filtros derivados):
+
+```python
+import plotly.express as px
+
+def gols_por_rodada(ctx):                     # ctx.df, ctx.time, ctx.ano, ctx.df_time_ano
+    jogos = br.evolucao(ctx.time, ctx.ano)
+    return px.bar(jogos, x="jogo", y="gols_pro")
+
+br.dashboard("Santos", incluir=[("Gols por jogo", gols_por_rodada)]).show()
+br.dashboard("Santos", incluir=[("Confronto", br.plot_confronto("Santos", "Palmeiras"))]).show()
+```
+
+Para reusar um painel seu pelo nome em qualquer dashboard, registre-o no catálogo:
+
+```python
+from dashgusbr import dashboard
+
+dashboard.registrar_painel("gols_por_rodada", gols_por_rodada, titulo="Gols por jogo")
+br.dashboard("Santos", incluir=["gols_por_rodada"]).show()
+```
+
+O resultado é um `go.Figure` comum: `salvar_html(fig, "palmeiras.html")` e
+`fig.update_layout(...)` funcionam normalmente. A seção 3 do
+[guia](examples/guia_dashgusbr.ipynb) mostra cada variação rodando.
+
+> Um painel entra em **uma** célula da grade, com um par de eixos: uma figura sua com eixo
+> secundário (`yaxis2`) cabe como painel, mas as séries saem todas no mesmo eixo — para eixo
+> duplo, exporte essa figura à parte.
 
 ## Como personalizar os gráficos
 
@@ -141,13 +217,17 @@ from dashgusbr import data, analytics, viz
 df  = data.carregar_dados()                       # OBT completa, schema canônico
 tab = analytics.classificacao(df, ano=2023)       # DataFrame → DataFrame
 fig = viz.classificacao(tab)                      # DataFrame → plotly Figure
+
+from dashgusbr import dashboard
+fig = dashboard.dashboard_time(df, "Palmeiras", 2023)   # painéis compostos em uma figura
 ```
 
 | Camada | Responsabilidade | Principais funções |
 |---|---|---|
 | `dashgusbr.data` | carga, fallback e caches (memória + disco) | `carregar_dados`, `carregar_geojson_estados`, `limpar_cache` |
-| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `evolucao_confronto`, `casa_fora`, `sequencias`, `forma_recente`, `desempenho_contra`, `corrida_titulo`, `lideres_temporada`, `ranking_historico`, `resumo_time`, `estatisticas_temporada`, `estatisticas_estados`, `fator_viagem`, `media_gols_por_decada`, `comparar_classicos`, `comparar_fases`, `distribuicao_placares`, `distribuicao_saldos`, `maiores_goleadas` |
-| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `evolucao_confronto`, `casa_fora`, `desempenho_contra`, `estados`, `mapa_estados`, `lideres`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares`, `distribuicao_saldos` |
+| `dashgusbr.analytics` | agregações Pandas | `classificacao`, `evolucao_pontos`, `historico_time`, `confronto`, `evolucao_confronto`, `casa_fora`, `sequencias`, `forma_recente`, `desempenho_contra`, `corrida_titulo`, `lideres_temporada`, `ranking_historico`, `resumo_time`, `estatisticas_temporada`, `estatisticas_estados`, `fator_viagem`, `media_gols_por_decada`, `comparar_classicos`, `comparar_fases`, `distribuicao_placares`, `distribuicao_saldos`, `maiores_goleadas`, `ultima_temporada` |
+| `dashgusbr.viz` | figuras Plotly | `classificacao`, `evolucao`, `historico`, `confronto`, `evolucao_confronto`, `casa_fora`, `desempenho_contra`, `estados`, `mapa_estados`, `lideres`, `gols_por_temporada`, `mandante_visitante`, `distribuicao_placares`, `distribuicao_saldos`, `forma`, `sequencias` |
+| `dashgusbr.dashboard` | composição de painéis em uma figura | `dashboard_time`, `paineis_disponiveis`, `registrar_painel`, `PAINEIS`, `PAINEIS_PADRAO` |
 | `dashgusbr.schema` | schema canônico e qualidade | `normalizar`, `validar`, `relatorio_consistencia` |
 | `dashgusbr.export` | exportação de figuras | `salvar_html`, `salvar_imagem` |
 
@@ -206,8 +286,10 @@ temporada; o confronto direto considera todas as fases.
 git clone https://github.com/gustavogasperetti/DashGusBr-lib.git
 cd DashGusBr-lib
 pip install -e ".[dev]"
-pytest                          # suíte offline (fixture com mini-OBT)
+pytest                          # suíte offline (fixture com mini-OBT): 161 testes
 pytest -m rede -o addopts=""    # smoke tests que baixam a OBT real (requer internet)
+ruff check src tests examples   # lint (o mesmo do CI)
+python examples/demo.py         # regenera galeria_dashgusbr.html com todos os gráficos
 ```
 
 Antes da publicação no PyPI, é possível instalar direto do GitHub:

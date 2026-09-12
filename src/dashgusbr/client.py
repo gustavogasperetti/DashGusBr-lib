@@ -16,7 +16,7 @@ from typing import Iterable, Optional, Union
 import pandas as pd
 import plotly.graph_objects as go
 
-from . import analytics, data, schema, viz
+from . import analytics, dashboard, data, schema, viz
 
 
 class Brasileirao:
@@ -101,6 +101,35 @@ class Brasileirao:
             pd.unique(pd.concat([partidas["mandante"], partidas["visitante"]]).dropna())
         )
 
+    # -- dashboard ---------------------------------------------------------
+
+    def dashboard(
+        self, time: str, ano_campeonato: Optional[int] = None, **kwargs
+    ) -> go.Figure:
+        """Dashboard completo do time, com os painéis padrão, em uma figura.
+
+        Sem ``ano_campeonato``, mostra o campeonato atual da base (a última
+        temporada que o time disputou); passe ``ano_campeonato=2020`` para
+        ver uma temporada antiga com os mesmos painéis.
+
+        Personalize sem perder o padrão: ``incluir=["sequencias"]``,
+        ``remover=["adversarios"]``, ``incluir=[minha_figura]`` ou
+        ``paineis=[...]`` para definir a lista inteira. Veja o catálogo em
+        :meth:`paineis`; os demais argumentos estão em
+        :func:`dashgusbr.dashboard.dashboard_time`.
+
+        Examples
+        --------
+        >>> br.dashboard("Palmeiras").show()                      # doctest: +SKIP
+        >>> br.dashboard("Palmeiras", ano_campeonato=2020).show() # doctest: +SKIP
+        >>> br.dashboard("Santos", incluir=["placares"]).show()   # doctest: +SKIP
+        """
+        return dashboard.dashboard_time(self.df, time, ano_campeonato, **kwargs)
+
+    def paineis(self) -> pd.DataFrame:
+        """O catálogo de painéis do dashboard: nome, se é padrão e descrição."""
+        return dashboard.paineis_disponiveis()
+
     # -- classificação -----------------------------------------------------
 
     def tabela(self, ano: int) -> pd.DataFrame:
@@ -108,12 +137,20 @@ class Brasileirao:
         return analytics.classificacao(self.df, ano)
 
     def plot_tabela(
-        self, ano: int, titulo: Optional[str] = None, **layout_kwargs
+        self,
+        ano: int,
+        titulo: Optional[str] = None,
+        destaque: Optional[str] = None,
+        **layout_kwargs,
     ) -> go.Figure:
-        """Gráfico de barras da classificação da temporada."""
+        """Gráfico de barras da classificação da temporada.
+
+        ``destaque="Palmeiras"`` acende só esse time e apaga os demais.
+        """
         return viz.classificacao(
             self.tabela(ano),
             titulo=titulo or f"Brasileirão {ano} — Classificação",
+            destaque=destaque,
             **layout_kwargs,
         )
 

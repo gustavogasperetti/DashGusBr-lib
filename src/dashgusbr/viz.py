@@ -30,7 +30,7 @@ from typing import Optional, Sequence, Union
 import pandas as pd
 import plotly.graph_objects as go
 
-from ._cores_times import cores_para_times
+from ._cores_times import _normalizar, cores_para_times
 from ._theme import (
     AZUL,
     CINZA_NEUTRO,
@@ -68,6 +68,24 @@ def _como_lista(cores: Cores, n: int, padrao: "list[str]") -> "list[str]":
     return [base[i % len(base)] for i in range(n)]
 
 
+def _resolver_na_serie(times: pd.Series, nome: str) -> str:
+    """Casa ``nome`` com um dos times da série, tolerando acento e caixa.
+
+    As funções de ``viz`` não veem a OBT (não podem usar
+    ``analytics._resolver_time``), mas o contrato é o mesmo: nome
+    desconhecido é erro com as opções, nunca um destaque silenciosamente
+    vazio.
+    """
+    opcoes = list(dict.fromkeys(times))
+    alvo = _normalizar(nome)
+    for time in opcoes:
+        if _normalizar(time) == alvo:
+            return time
+    raise ValueError(
+        f"{nome!r} não está nesta tabela. Opções: {', '.join(sorted(opcoes))}."
+    )
+
+
 def _finalizar(fig: go.Figure, layout_kwargs: dict) -> go.Figure:
     """Aplica os ajustes de layout do usuário por último (eles têm a palavra final)."""
     if layout_kwargs:
@@ -85,6 +103,7 @@ def classificacao(
     titulo: Optional[str] = None,
     cores: Cores = None,
     mostrar_valores: bool = True,
+    destaque: Optional[str] = None,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras horizontais de pontos da tabela de classificação.
@@ -93,21 +112,33 @@ def classificacao(
     (magnitude) → um matiz só, sem legenda; o detalhe (V/E/D, saldo,
     aproveitamento) fica no hover. ``mostrar_valores=False`` esconde os
     rótulos de pontos.
+
+    ``destaque="Palmeiras"`` pinta só esse time com a cor da série e apaga os
+    demais em cinza neutro — é o modo usado pelo painel de classificação do
+    dashboard por time. O nome é resolvido com a mesma tolerância a acentos
+    e caixa do resto da biblioteca; nome fora da tabela é erro.
     """
     dados = tabela.sort_values("posicao", ascending=False)  # 1º no topo do eixo y
     rotulos = dados["posicao"].astype(str) + "º " + dados["time"]
     (cor,) = _como_lista(cores, 1, [AZUL])
+    if destaque is None:  # série única: uma cor só (não uma lista de cores iguais)
+        paleta = cor
+        tinta_interna = cor_texto_para(cor)
+    else:
+        alvo = _resolver_na_serie(dados["time"], destaque)
+        paleta = [cor if time == alvo else CINZA_NEUTRO for time in dados["time"]]
+        tinta_interna = [cor_texto_para(c) for c in paleta]
 
     fig = go.Figure(
         go.Bar(
             x=dados["pontos"],
             y=rotulos,
             orientation="h",
-            marker=dict(color=cor),
+            marker=dict(color=paleta),
             text=dados["pontos"] if mostrar_valores else None,
             textposition="outside",
             textfont=dict(color=TINTA_SECUNDARIA, size=12),
-            insidetextfont=dict(color=cor_texto_para(cor)),
+            insidetextfont=dict(color=tinta_interna),
             customdata=dados[
                 ["vitorias", "empates", "derrotas", "saldo", "aproveitamento"]
             ],
@@ -433,6 +464,162 @@ def casa_fora(
             showarrow=False,
             font=dict(color=TINTA_SECUNDARIA, size=11),
         )
+    return _finalizar(fig, layout_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Forma recente e sequências
+# ---------------------------------------------------------------------------
+
+
+ROTULO_RESULTADO = {"V": "Vitórias", "E": "Empates", "D": "Derrotas"}
+
+
+def forma(
+    jogos: pd.DataFrame,
+    titulo: Optional[str] = None,
+    cores: Cores = None,
+    mostrar_valores: bool = True,
+    mostrar_legenda: bool = True,
+    **layout_kwargs,
+) -> go.Figure:
+    """Barras dos pontos jogo a jogo nos últimos jogos do time.
+
+    Espera a saída de :func:`dashgusbr.analytics.forma_recente` (do jogo mais
+    antigo ao mais recente). Uma série por resultado — vitória e derrota
+    recebem slots categóricos, o empate usa o cinza neutro —, com o placar no
+    rótulo e o adversário no eixo (``(C)`` em casa, ``(F)`` fora).
+    """
+    if jogos.empty:
+        raise ValueError("Sem jogos para desenhar a forma recente.")
+    time = jogos.attrs.get("time", "")
+    aproveitamento = jogos.attrs.get("aproveitamento")
+    paleta = dict(zip("VED", _como_lista(cores, 3, [AZUL, CINZA_NEUTRO, VERMELHO])))
+
+    posicoes = list(range(len(jogos)))
+    marca = {"mandante": "C", "visitante": "F"}
+    eixo = [
+        f"{adv} ({marca.get(local, '?')})"
+        for adv, local in zip(jogos["adversario"], jogos["local"])
+    ]
+    placares = [
+        f"{int(gp)} x {int(gc)}"
+        for gp, gc in zip(jogos["gols_pro"], jogos["gols_contra"])
+    ]
+
+    fig = go.Figure()
+    for resultado, nome in ROTULO_RESULTADO.items():
+        marcados = [i for i in posicoes if jogos["resultado"].iloc[i] == resultado]
+        if not marcados:
+            continue
+        cor = paleta[resultado]
+        fig.add_trace(
+            go.Bar(
+                x=marcados,
+                y=[jogos["pontos"].iloc[i] for i in marcados],
+                name=nome,
+                offsetgroup="forma",  # um jogo por posição: sem deslocar as barras
+                marker=dict(color=cor),
+                text=[placares[i] for i in marcados] if mostrar_valores else None,
+                textposition="outside",
+                textfont=dict(color=TINTA_SECUNDARIA, size=11),
+                insidetextfont=dict(color=cor_texto_para(cor)),
+                customdata=[
+                    [eixo[i], placares[i], str(jogos["data"].iloc[i])[:10]]
+                    for i in marcados
+                ],
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b><br>"
+                    "%{customdata[1]} · %{y} ponto(s)<br>"
+                    "%{customdata[2]}<extra></extra>"
+                ),
+            )
+        )
+
+    sufixo = f" — {aproveitamento}% de aproveitamento" if aproveitamento else ""
+    fig.update_layout(
+        template=TEMA,
+        title=titulo or f"{time} — últimos {len(jogos)} jogos{sufixo}".strip(" —"),
+        xaxis=dict(
+            title=None,
+            showgrid=False,
+            tickmode="array",
+            tickvals=posicoes,
+            ticktext=eixo,
+            tickangle=-30,
+        ),
+        yaxis=dict(title="Pontos", dtick=1, rangemode="tozero"),
+        barmode="group",
+        bargap=0.35,
+        showlegend=mostrar_legenda,
+    )
+    return _finalizar(fig, layout_kwargs)
+
+
+ROTULO_SEQUENCIA = {
+    "vitorias": "Vitórias seguidas",
+    "invencibilidade": "Jogos invicto",
+    "derrotas": "Derrotas seguidas",
+    "sem_vencer": "Jogos sem vencer",
+}
+
+
+def sequencias(
+    seq: pd.DataFrame,
+    titulo: Optional[str] = None,
+    cores: Cores = None,
+    mostrar_valores: bool = True,
+    **layout_kwargs,
+) -> go.Figure:
+    """Barras das maiores sequências do time (recordes do recorte).
+
+    Espera a saída de :func:`dashgusbr.analytics.sequencias`. Cada tipo tem
+    sua cor (as boas em azul/verde, as ruins em vermelho/cinza) porque as
+    quatro barras não são a mesma grandeza; o período de cada recorde fica no
+    hover.
+    """
+    time = seq.attrs.get("time", "")
+    paleta = dict(
+        zip(
+            ROTULO_SEQUENCIA,
+            _como_lista(cores, 4, [AZUL, VERDE, VERMELHO, CINZA_NEUTRO]),
+        )
+    )
+    dados = seq.iloc[::-1]  # a primeira linha no topo do eixo y
+    rotulos = [ROTULO_SEQUENCIA.get(t, t) for t in dados["tipo"]]
+    barras = [paleta.get(t, AZUL) for t in dados["tipo"]]
+
+    def _periodo(inicio, fim) -> str:
+        if pd.isna(inicio) or pd.isna(fim):
+            return "sem registro"
+        return f"{str(inicio)[:10]} → {str(fim)[:10]}"
+
+    fig = go.Figure(
+        go.Bar(
+            x=dados["tamanho"],
+            y=rotulos,
+            orientation="h",
+            marker=dict(color=barras),
+            text=dados["tamanho"] if mostrar_valores else None,
+            textposition="outside",
+            textfont=dict(color=TINTA_SECUNDARIA, size=12),
+            insidetextfont=dict(color=[cor_texto_para(c) for c in barras]),
+            customdata=[
+                _periodo(i, f) for i, f in zip(dados["inicio"], dados["fim"])
+            ],
+            hovertemplate=(
+                "<b>%{y}</b><br>%{x} jogos<br>%{customdata}<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        template=TEMA,
+        title=titulo or f"{time} — maiores sequências".strip(" —"),
+        xaxis=dict(title="Jogos", rangemode="tozero", dtick=1),
+        yaxis=dict(title=None, showgrid=False),
+        showlegend=False,
+        bargap=0.4,
+    )
     return _finalizar(fig, layout_kwargs)
 
 

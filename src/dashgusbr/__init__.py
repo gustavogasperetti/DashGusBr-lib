@@ -10,6 +10,7 @@ Uso rápido::
 
     br = Brasileirao()
     br.tabela(2023)                      # DataFrame da classificação
+    br.dashboard("Palmeiras").show()     # dashboard pronto do time
     br.plot_confronto("Flamengo", "Palmeiras").show()
 
 Uso avançado (camadas puras)::
@@ -21,9 +22,10 @@ Uso avançado (camadas puras)::
     fig = viz.classificacao(tab)
 """
 
-from . import analytics, config, data, export, schema, viz
+from . import analytics, config, dashboard, data, export, schema, viz
 from ._cores_times import cor_time, cores_para_times
 from .client import Brasileirao
+from .dashboard import dashboard_time
 from .data import carregar_dados
 from .export import salvar_html, salvar_imagem
 
@@ -32,12 +34,14 @@ __version__ = "0.3.0"
 __all__ = [
     "Brasileirao",
     "carregar_dados",
+    "dashboard_time",
     "cor_time",
     "cores_para_times",
     "salvar_html",
     "salvar_imagem",
     "analytics",
     "config",
+    "dashboard",
     "data",
     "export",
     "schema",

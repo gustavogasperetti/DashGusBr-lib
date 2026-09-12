@@ -8,6 +8,23 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Dashboard por time**: `br.dashboard("Palmeiras")` monta, em uma única
+  figura, os painéis padrão do clube no campeonato atual da base —
+  indicadores da campanha, evolução de pontos, casa × fora, classificação com
+  o time destacado, aproveitamento por adversário, últimos jogos e histórico.
+  `ano_campeonato=2020` troca a temporada mantendo os mesmos painéis.
+- **Dashboard personalizável**: `incluir=`/`remover=`/`paineis=` ajustam a
+  lista sem perder o padrão; `incluir=` também aceita figuras suas e funções
+  `(ctx) -> go.Figure`. Catálogo em `br.paineis()` (painéis extras:
+  `posicao`, `sequencias`, `placares`, `saldos`, `adversarios_historico`) e
+  `dashboard.registrar_painel()` para publicar painéis próprios pelo nome.
+- **Duas figuras novas em `viz`**: `viz.forma` (pontos jogo a jogo nos últimos
+  jogos, uma série por resultado) e `viz.sequencias` (recordes de vitórias,
+  invencibilidade, derrotas e jejum).
+- **Destaque na classificação**: `viz.classificacao(tab, destaque="Santos")` e
+  `br.plot_tabela(2023, destaque="Santos")` acendem um time e apagam os demais.
+- **Campeonato atual**: `analytics.ultima_temporada(df, time=None)` — a última
+  temporada da base (ou do time), usada quando o dashboard é chamado sem ano.
 - **Tema escuro** próprio: template `dashgusbr_escuro`, aplicável com
   `template="dashgusbr_escuro"` em qualquer `plot_*`/`viz.*`.
 - **Contraste automático**: rótulos que caem dentro de barras recebem cor de
