@@ -97,6 +97,7 @@ com os gráficos padrão do clube na temporada atual da base.
 br.dashboard("Palmeiras").show()                       # campeonato atual
 br.dashboard("Palmeiras", ano_campeonato=2020).show()  # temporada antiga, mesmos painéis
 br.dashboard("gremio").show()                          # nome tolerante a acento e caixa
+br.dashboard(["Palmeiras", "Corinthians"]).show()      # dois clubes, lado a lado
 ```
 
 Os painéis padrão são sempre os mesmos — é o que faz dois times (ou duas temporadas do mesmo
@@ -111,6 +112,38 @@ time) serem comparáveis de bate-pronto:
 | `adversarios` | aproveitamento contra cada adversário da temporada |
 | `forma` | pontos jogo a jogo no fim da temporada |
 | `historico` | aproveitamento temporada a temporada, com o ano do recorte marcado |
+
+### Comparando clubes
+
+Passe uma **lista** (até quatro clubes) e o mesmo padrão vira uma comparação:
+
+```python
+br.dashboard(["Palmeiras", "Corinthians"], 2023, cores_times=True).show()
+br.dashboard(["Flamengo", "Vasco", "Fluminense"], 2019, remover=["adversarios"]).show()
+```
+
+Cada painel sabe o que fazer com N clubes:
+
+| Estratégia | Painéis | Como fica |
+|---|---|---|
+| `unico` | `evolucao`, `classificacao`, `historico`, `posicao` | todos na **mesma** figura — uma série por clube, ou a tabela com todos acesos |
+| `repetir` | `casa_fora`, `forma`, `adversarios`, `placares`, `saldos`, `sequencias` | *small multiples*: um tile por clube, lado a lado, na mesma escala |
+| `indicadores` | — | uma faixa de números por clube, rotulada com o nome dele |
+
+A coluna `comparacao` de `br.paineis()` mostra a estratégia de cada painel, e
+`registrar_painel(..., comparacao="unico")` define a dos seus.
+
+Duas regras que valem conhecer:
+
+- **cor fixa por clube** em todos os painéis — sem isso a comparação não se lê. Com
+  `cores_times=True` cada um usa a cor oficial (cuidado: dois alvinegros ficam iguais);
+  sem ela, cada clube pega um slot da paleta validada para daltonismo.
+- **a temporada é a mais recente que todos disputaram** quando você não passa
+  `ano_campeonato`; um ano em que um dos clubes não jogou é erro na entrada, e não um
+  painel quebrando no meio.
+
+Com 3 ou 4 clubes os tiles ficam estreitos — vale um `remover=["adversarios"]`
+(o painel com os nomes dos adversários no eixo) ou `colunas=1`.
 
 ### Modificando o dashboard
 

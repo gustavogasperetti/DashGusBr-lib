@@ -12,6 +12,21 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Comparação entre clubes**: `br.dashboard(["Palmeiras", "Corinthians"], 2023)`
+  — até quatro clubes no mesmo padrão de painéis. Painéis `unico` (evolução,
+  classificação, histórico, posição) põem todos na mesma figura; os demais
+  viram *small multiples*, um tile por clube na mesma escala; os indicadores
+  ganham uma faixa por clube. Cada clube tem cor fixa em todos os painéis e,
+  sem `ano_campeonato`, o recorte é a última temporada que **todos**
+  disputaram. A estratégia de cada painel fica na coluna `comparacao` de
+  `br.paineis()` e em `registrar_painel(..., comparacao=)`.
+- **`viz.historico` e `viz.classificacao` com vários times**: a primeira
+  aceita campanhas empilhadas (uma linha por clube) e a segunda aceita
+  `destaque=["Palmeiras", "Corinthians"]`.
+
+## [0.4.0] - 2026-09-12
+
+### Adicionado
 - **Dashboard por time**: `br.dashboard("Palmeiras")` monta, em uma única
   figura, os painéis padrão do clube no campeonato atual da base —
   indicadores da campanha, evolução de pontos, casa × fora, classificação com
@@ -108,7 +123,8 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Módulos de apoio `config`, `schema` e tema visual.
 - Suíte de testes (`pytest`) e exemplo de uso em `examples/demo.py`.
 
-[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.3.0...HEAD
+[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.0...v0.1.1

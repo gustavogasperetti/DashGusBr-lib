@@ -103,7 +103,7 @@ def classificacao(
     titulo: Optional[str] = None,
     cores: Cores = None,
     mostrar_valores: bool = True,
-    destaque: Optional[str] = None,
+    destaque: Union[str, Sequence[str], None] = None,
     **layout_kwargs,
 ) -> go.Figure:
     """Barras horizontais de pontos da tabela de classificação.
@@ -115,8 +115,10 @@ def classificacao(
 
     ``destaque="Palmeiras"`` pinta só esse time com a cor da série e apaga os
     demais em cinza neutro — é o modo usado pelo painel de classificação do
-    dashboard por time. O nome é resolvido com a mesma tolerância a acentos
-    e caixa do resto da biblioteca; nome fora da tabela é erro.
+    dashboard por time. Uma lista (``destaque=["Palmeiras", "Corinthians"]``)
+    acende vários, um slot de cor por time, para comparar campanhas na mesma
+    tabela. Os nomes são resolvidos com a mesma tolerância a acentos e caixa
+    do resto da biblioteca; nome fora da tabela é erro.
     """
     dados = tabela.sort_values("posicao", ascending=False)  # 1º no topo do eixo y
     rotulos = dados["posicao"].astype(str) + "º " + dados["time"]
@@ -125,8 +127,10 @@ def classificacao(
         paleta = cor
         tinta_interna = cor_texto_para(cor)
     else:
-        alvo = _resolver_na_serie(dados["time"], destaque)
-        paleta = [cor if time == alvo else CINZA_NEUTRO for time in dados["time"]]
+        pedidos = [destaque] if isinstance(destaque, str) else list(destaque)
+        alvos = [_resolver_na_serie(dados["time"], nome) for nome in pedidos]
+        do_alvo = dict(zip(alvos, _como_lista(cores, len(alvos), CORES_CATEGORICAS)))
+        paleta = [do_alvo.get(time, CINZA_NEUTRO) for time in dados["time"]]
         tinta_interna = [cor_texto_para(c) for c in paleta]
 
     fig = go.Figure(
@@ -242,43 +246,61 @@ def historico(
     titulo: Optional[str] = None,
     cores: Cores = None,
     usar_cores_times: bool = False,
+    mostrar_legenda: Optional[bool] = None,
     **layout_kwargs,
 ) -> go.Figure:
-    """Linha do desempenho de um time temporada a temporada.
+    """Linha do desempenho temporada a temporada — de um ou mais times.
 
-    Espera a saída de :func:`dashgusbr.analytics.historico_time`. A métrica
-    padrão é o aproveitamento (%), comparável entre a era de 2 e a de 3
-    pontos por vitória — pontos absolutos e nº de jogos variam de formato
-    para formato.
+    Espera a saída de :func:`dashgusbr.analytics.historico_time` — ou a
+    concatenação de várias, uma por time (a coluna ``time`` identifica a
+    série), para comparar carreiras na mesma figura. A métrica padrão é o
+    aproveitamento (%), comparável entre a era de 2 e a de 3 pontos por
+    vitória — pontos absolutos e nº de jogos variam de formato para formato.
     """
     if metrica not in historico_df.columns:
         raise ValueError(f"Métrica {metrica!r} não existe no histórico.")
-    time = historico_df["time"].iloc[0] if "time" in historico_df.columns else ""
-    padrao = cores_para_times([time]) if usar_cores_times and time else [AZUL]
-    (cor,) = _como_lista(cores, 1, padrao)
+    if "time" in historico_df.columns:
+        times = list(pd.unique(historico_df["time"]))
+    else:
+        times = [""]
+    padrao = cores_para_times(times) if usar_cores_times and times[0] else CORES_CATEGORICAS
+    paleta = _como_lista(cores, len(times), padrao)
 
-    fig = go.Figure(
-        go.Scatter(
-            x=historico_df["ano_campeonato"],
-            y=historico_df[metrica],
-            mode="lines+markers",
-            line=dict(color=cor, width=2),
-            marker=dict(size=8, color=cor),
-            customdata=historico_df[["posicao", "pontos", "jogos"]],
-            hovertemplate=(
-                "<b>%{x}</b><br>"
-                f"{metrica}: %{{y}}<br>"
-                "Posição: %{customdata[0]}º · %{customdata[1]} pts em "
-                "%{customdata[2]} jogos<extra></extra>"
-            ),
+    fig = go.Figure()
+    for i, time in enumerate(times):
+        serie = (
+            historico_df[historico_df["time"] == time]
+            if "time" in historico_df.columns
+            else historico_df
         )
-    )
+        fig.add_trace(
+            go.Scatter(
+                x=serie["ano_campeonato"],
+                y=serie[metrica],
+                mode="lines+markers",
+                name=time,
+                line=dict(color=paleta[i], width=2),
+                marker=dict(size=8, color=paleta[i]),
+                customdata=serie[["posicao", "pontos", "jogos"]],
+                hovertemplate=(
+                    f"<b>{time} — %{{x}}</b><br>" if time else "<b>%{x}</b><br>"
+                )
+                + (
+                    f"{metrica}: %{{y}}<br>"
+                    "Posição: %{customdata[0]}º · %{customdata[1]} pts em "
+                    "%{customdata[2]} jogos<extra></extra>"
+                ),
+            )
+        )
+    um_time = times[0] if len(times) == 1 else ""
     fig.update_layout(
         template=TEMA,
-        title=titulo or f"{time} — {metrica} por temporada".strip(),
+        title=titulo or f"{um_time} — {metrica} por temporada".strip(" —"),
         xaxis_title="Temporada",
         yaxis_title=metrica.replace("_", " ").capitalize(),
-        showlegend=False,
+        showlegend=(
+            mostrar_legenda if mostrar_legenda is not None else len(times) > 1
+        ),
     )
     if metrica == "aproveitamento":
         fig.update_yaxes(range=[0, 100], ticksuffix="%")

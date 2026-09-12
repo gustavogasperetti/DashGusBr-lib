@@ -45,6 +45,11 @@ def main() -> None:
             ),
         ),
         (
+            "Dashboard comparando dois clubes",
+            f"br.dashboard([{g4[0]!r}, {g4[1]!r}], ano_campeonato={ano}, cores_times=True)",
+            br.dashboard(g4[:2], ano_campeonato=ano, cores_times=True),
+        ),
+        (
             "Classificação",
             f"br.plot_tabela({ano})",
             br.plot_tabela(ano),
@@ -123,7 +128,7 @@ def main() -> None:
 
     try:
         galeria.insert(
-            15,
+            16,
             (
                 "Mapa por estado (coroplético)",
                 "br.plot_mapa_estados()",

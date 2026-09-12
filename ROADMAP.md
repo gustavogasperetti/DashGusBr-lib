@@ -78,7 +78,8 @@ Fechado em jul/2026. Estado final de cada tema:
 
 ## Pós-v1 — entregue em set/2026 📦
 
-Trabalho fechado depois do v1, antes do v2 começar.
+Trabalho fechado depois do v1, antes do v2 começar. O dashboard por time saiu
+na **v0.4.0**; a comparação entre clubes está pronta e sai na próxima.
 
 ### Dashboard por time 🧩
 - [x] **`br.dashboard("Palmeiras")`** — uma única `go.Figure` com os painéis
@@ -97,9 +98,14 @@ Trabalho fechado depois do v1, antes do v2 começar.
   remapeia eixos, anotações, formas e barras de cor de cada figura para a
   célula certa, com mini-legenda por painel e reserva de margem/calha para os
   nomes de clube dos gráficos de barras horizontais.
-- [x] **Novas figuras de apoio** — `viz.forma`, `viz.sequencias` e
-  `destaque=` em `viz.classificacao`/`br.plot_tabela`.
-- [x] **Cobertura** — 161 testes offline (43 só do dashboard); notebook e
+- [x] **Comparação entre clubes** — `br.dashboard(["Palmeiras",
+  "Corinthians"])`: até quatro clubes no mesmo padrão, com painéis
+  compartilhados (`unico`) e *small multiples* (`repetir`), cor fixa por
+  clube e recorte na última temporada comum a todos.
+- [x] **Novas figuras de apoio** — `viz.forma`, `viz.sequencias`,
+  `viz.historico` com várias campanhas e `destaque=` (um time ou vários) em
+  `viz.classificacao`/`br.plot_tabela`.
+- [x] **Cobertura** — 184 testes offline (66 só do dashboard); notebook e
   galeria atualizados com a seção do dashboard.
 - [ ] 🟡 ⚡ **Conferência visual** — a geometria é validada por teste
   (domínios, alturas, calhas), mas falta uma revisão a olho e um teste de
@@ -162,9 +168,12 @@ contrato de dados** com o ETL.
   chrome (seletores, abas, cache do Streamlit).
 - [ ] 🟡 ⚡ **Dashboard no CLI** — `python -m dashgusbr dashboard Palmeiras
   --ano 2020 --html palmeiras.html`: o painel completo sem escrever Python.
-- [ ] 🟢 ⚙️ **Outros dashboards prontos** — `dashboard_confronto(a, b)` e
-  `dashboard_temporada(ano)` reusando o mesmo motor de composição e o mesmo
-  catálogo de painéis.
+- [ ] 🟢 ⚙️ **Outros dashboards prontos** — `dashboard_temporada(ano)`
+  reusando o mesmo motor de composição e o mesmo catálogo de painéis (a
+  comparação entre clubes já saiu no pós-v1).
+- [ ] 🟢 ⚡ **Comparar campanhas de anos diferentes** — hoje a comparação usa
+  uma temporada só para todos; falta o recorte `[("Palmeiras", 2023),
+  ("Flamengo", 2019)]` (ver 3.2, "comparador de campanhas").
 - [ ] 🟢 ⚙️ **Animação da corrida do título** — frames por rodada (depende da
   coluna `rodada`) no `plot_corrida_titulo(animado=True)`.
 - [ ] 🟢 ⚡ **Presets de exportação** — `salvar_imagem(fig, preset="twitter")`

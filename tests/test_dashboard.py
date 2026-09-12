@@ -306,7 +306,7 @@ def test_cliente_expoe_dashboard_e_catalogo(caminho_csv):
         "1971"
     )
     catalogo = br.paineis()
-    assert set(catalogo.columns) == {"painel", "padrao", "descricao"}
+    assert set(catalogo.columns) == {"painel", "padrao", "comparacao", "descricao"}
     assert catalogo["padrao"].sum() == len(dashboard.PAINEIS_PADRAO)
 
 
@@ -347,3 +347,185 @@ def test_calha_nunca_fica_maior_que_o_painel(obt):
     larguras = [d[1] - d[0] for d in dominios]
     calhas = [b[0] - a[1] for a, b in zip(dominios, dominios[1:]) if b[0] > a[1]]
     assert min(larguras) >= max(calhas) - 1e-9  # o teto bate exato em 6 colunas
+
+
+# ---------------------------------------------------------------------------
+# Comparação entre times
+# ---------------------------------------------------------------------------
+
+
+def _rotulos(fig) -> "list[str]":
+    return [a.text for a in fig.layout.annotations if (a.text or "").startswith("<b>")]
+
+
+def test_lista_de_times_compara_no_mesmo_padrao(obt):
+    fig = dashboard.dashboard_time(obt, ["Palmeiras", "Santos"], 2023)
+    assert fig.layout.title.text == "Palmeiras × Santos — Brasileirão 2023"
+    assert "2 clubes lado a lado" in _anotacoes(fig)
+
+
+def test_paineis_repetidos_viram_small_multiples(obt):
+    fig = dashboard.dashboard_time(obt, ["Palmeiras", "Santos"], 2023)
+    rotulos = _rotulos(fig)
+    assert any(r.endswith("— Palmeiras</b>") for r in rotulos)
+    assert any(r.endswith("— Santos</b>") for r in rotulos)
+
+
+def test_small_multiples_ficam_na_mesma_linha_e_do_mesmo_tamanho(obt):
+    fig = dashboard.dashboard_time(obt, ["Palmeiras", "Santos"], 2023, paineis=["forma"])
+    x1, x2 = fig.layout.xaxis.domain, fig.layout.xaxis2.domain
+    assert fig.layout.yaxis.domain == fig.layout.yaxis2.domain  # mesma linha
+    assert (x1[1] - x1[0]) == pytest.approx(x2[1] - x2[0])  # mesma largura
+    assert x1[1] <= x2[0]
+
+
+def test_paineis_unicos_juntam_os_times_na_mesma_figura(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos"], 2023, paineis=["evolucao"]
+    )
+    assert {t.name for t in fig.data} == {"Palmeiras", "Santos"}
+    assert fig.layout.xaxis.domain == (0.0, 1.0)  # compartilhado ocupa a linha toda
+
+
+def test_historico_compara_as_carreiras_na_mesma_figura(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos"], 2023, paineis=["historico"]
+    )
+    assert {t.name for t in fig.data} == {"Palmeiras", "Santos"}
+
+
+def test_classificacao_acende_todos_os_comparados(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos"], 2023, paineis=["classificacao"]
+    )
+    tabela = analytics.classificacao(obt, 2023).sort_values("posicao", ascending=False)
+    acesos = {
+        time
+        for time, cor in zip(tabela["time"], fig.data[0].marker.color)
+        if cor != dashboard.CINZA_NEUTRO
+    }
+    assert acesos == {"Palmeiras", "Santos"}
+
+
+def test_uma_faixa_de_indicadores_por_time_rotulada_com_a_cor(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos"], 2023, paineis=["indicadores"]
+    )
+    indicadores = [t for t in fig.data if t.type == "indicator"]
+    assert len(indicadores) == 12  # 6 números para cada clube
+    nomes = ("<b>Palmeiras</b>", "<b>Santos</b>")
+    rotulos = {
+        a.text: a.font.color for a in fig.layout.annotations if a.text in nomes
+    }
+    assert set(rotulos) == set(nomes)
+    assert len(set(rotulos.values())) == 2  # uma cor por clube
+
+
+def test_cada_time_tem_a_mesma_cor_em_todos_os_paineis(obt):
+    times = ["Palmeiras", "Santos"]
+    fig = dashboard.dashboard_time(obt, times, 2023, paineis=["evolucao", "historico"])
+    cores = {}
+    for trace in fig.data:
+        if trace.name in times:
+            cores.setdefault(trace.name, set()).add(trace.line.color)
+    assert all(len(v) == 1 for v in cores.values())  # cor fixa por clube
+    assert len({next(iter(v)) for v in cores.values()}) == 2  # e diferente entre eles
+
+
+def test_cores_times_na_comparacao_usa_a_cor_oficial(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos"], 2023, paineis=["evolucao"], cores_times=True
+    )
+    por_time = {t.name: t.line.color for t in fig.data}
+    assert por_time == {"Palmeiras": "#006437", "Santos": "#1b1b1b"}
+
+
+def test_tres_times_viram_tres_tiles_iguais(obt):
+    fig = dashboard.dashboard_time(
+        obt, ["Palmeiras", "Santos", "Botafogo"], 2023, paineis=["casa_fora"]
+    )
+    larguras = {
+        round(fig.layout[k]["domain"][1] - fig.layout[k]["domain"][0], 6)
+        for k in ("xaxis", "xaxis2", "xaxis3")
+    }
+    alturas = {fig.layout[k]["domain"] for k in ("yaxis", "yaxis2", "yaxis3")}
+    assert len(larguras) == 1 and len(alturas) == 1  # mesma linha, mesmo tamanho
+
+
+@pytest.mark.parametrize(
+    "times, esperado", [(1, 1), (2, 2), (3, 3), (4, 2)]  # 4 clubes = 2 linhas de 2
+)
+def test_tiles_por_linha_sempre_dividem_a_grade(times, esperado):
+    por_linha = dashboard.CELULAS_POR_LINHA[times]
+    assert por_linha == esperado
+    assert dashboard.COLUNAS_GRADE % por_linha == 0  # tiles de largura igual
+
+
+def test_sem_ano_usa_a_ultima_temporada_comum(obt):
+    fig = dashboard.dashboard_time(obt, ["Palmeiras", "Santos"])
+    assert fig.layout.title.text.endswith("2023")
+
+
+def test_ano_em_que_um_dos_times_nao_jogou_e_erro(obt):
+    """Erro claro na entrada, e não um painel estourando no meio da montagem."""
+    de_2023 = obt["ano_campeonato"] == 2023
+    do_santos = (obt["mandante"] == "Santos") | (obt["visitante"] == "Santos")
+    sem_santos_em_2023 = obt[~(de_2023 & do_santos)]
+    with pytest.raises(ValueError, match="'Santos' não disputou"):
+        dashboard.dashboard_time(sem_santos_em_2023, ["Palmeiras", "Santos"], 2023)
+
+
+def test_time_repetido_na_comparacao_e_erro(obt):
+    with pytest.raises(ValueError, match="mais de uma vez"):
+        dashboard.dashboard_time(obt, ["Palmeiras", "palmeiras"], 2023)
+
+
+def test_comparacao_tem_teto_de_times(obt):
+    with pytest.raises(ValueError, match="no máximo"):
+        dashboard.dashboard_time(obt, ["Palmeiras"] * 5, 2023)
+
+
+def test_lista_vazia_e_erro(obt):
+    with pytest.raises(ValueError, match="ao menos um time"):
+        dashboard.dashboard_time(obt, [], 2023)
+
+
+def test_um_time_em_lista_nao_liga_a_comparacao(obt):
+    uma_lista = dashboard.dashboard_time(obt, ["Palmeiras"], 2023)
+    string = dashboard.dashboard_time(obt, "Palmeiras", 2023)
+    assert uma_lista.layout.height == string.layout.height
+    assert _rotulos(uma_lista) == _rotulos(string)
+
+
+def test_contexto_para_foca_em_um_clube(obt):
+    ctx = dashboard.Contexto(
+        obt, "Palmeiras", 2023, times=["Palmeiras", "Santos"],
+        cores={"Palmeiras": "#111111", "Santos": "#222222"},
+    )
+    assert ctx.comparando
+    recorte = ctx.para("Santos")
+    assert (recorte.time, recorte.cor, recorte.comparando) == (
+        "Santos",
+        "#222222",
+        False,
+    )
+    jogos = recorte.df_time_ano
+    assert not jogos.empty
+    assert ((jogos["mandante"] == "Santos") | (jogos["visitante"] == "Santos")).all()
+
+
+def test_cliente_aceita_lista(caminho_csv):
+    br = Brasileirao(fonte=caminho_csv, cache=False)
+    fig = br.dashboard(["palmeiras", "santos"], 2023)
+    assert fig.layout.title.text == "Palmeiras × Santos — Brasileirão 2023"
+
+
+def test_times_sem_temporada_em_comum_e_erro(obt):
+    """Sem ano comum não há o que comparar — o erro diz o que fazer."""
+    so_1971 = obt["ano_campeonato"] == 1971
+    do_santos = (obt["mandante"] == "Santos") | (obt["visitante"] == "Santos")
+    do_botafogo = (obt["mandante"] == "Botafogo") | (obt["visitante"] == "Botafogo")
+    # Santos só em 1971, Botafogo só em 2023
+    disjunto = obt[~(so_1971 & do_botafogo) & ~(~so_1971 & do_santos)]
+    with pytest.raises(ValueError, match="nunca disputaram a mesma"):
+        dashboard.dashboard_time(disjunto, ["Santos", "Botafogo"])

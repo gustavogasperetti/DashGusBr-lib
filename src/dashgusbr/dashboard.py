@@ -8,6 +8,7 @@ por gráfico::
     br = Brasileirao()
     br.dashboard("Palmeiras").show()              # campeonato atual da base
     br.dashboard("Palmeiras", ano_campeonato=2020).show()   # temporada antiga
+    br.dashboard(["Palmeiras", "Corinthians"]).show()       # comparando clubes
 
 O conjunto inicial de painéis é fixo (:data:`PAINEIS_PADRAO`) — é o padrão
 que faz dois times, ou duas temporadas do mesmo time, serem comparáveis de
@@ -20,6 +21,11 @@ bate-pronto. A personalização acontece *em cima* desse padrão:
 - ``paineis=[...]``                ignora o padrão e define a lista inteira;
 - ``registrar_painel(...)``        publica um painel seu no catálogo, para
   reusar pelo nome em qualquer dashboard.
+
+Passar uma lista de clubes liga o modo comparação: painéis ``"unico"``
+(evolução, classificação, histórico) põem todos na mesma figura e painéis
+``"repetir"`` viram *small multiples*, um tile por clube na mesma escala —
+com cor fixa por clube em todos os painéis.
 
 Veja o catálogo com :func:`paineis_disponiveis` (ou ``br.paineis()``).
 
@@ -45,10 +51,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from . import analytics, viz
-from ._cores_times import cor_time
+from ._cores_times import cores_para_times
 from ._theme import (
     AZUL,
     CINZA_NEUTRO,
+    CORES_CATEGORICAS,
     TEMA,
     TEMA_ESCURO,
     TINTA,
@@ -67,6 +74,7 @@ VERMELHO = viz.VERMELHO
 COLUNAS_GRADE = 6
 
 ALTURA_KPI = 116  # altura da faixa de indicadores
+ALTURA_ROTULO = 26  # espaço extra quando a faixa é rotulada com o nome do clube
 ESPACO_LINHA = 96  # respiro vertical entre linhas de painéis (px)
 MARGEM_TOPO = 120  # espaço do título + subtítulo
 MARGEM_BASE = 64
@@ -84,11 +92,17 @@ LARGURA_NOMINAL = 1200
 
 
 class Contexto:
-    """O recorte de um dashboard: base, time já resolvido e temporada.
+    """O recorte de um dashboard: base, time(s) já resolvido(s) e temporada.
 
     É o único argumento que um painel recebe. Os filtros derivados
     (:attr:`df_ano`, :attr:`df_time_ano`) são preguiçosos e ficam em cache —
     um dashboard com oito painéis não refaz oito vezes o mesmo filtro.
+
+    Na comparação, :attr:`times` tem todos os clubes e :attr:`time` é o
+    primeiro deles; :attr:`cores` fixa a cor de cada clube para o dashboard
+    inteiro (o mesmo clube tem que ter a mesma cor em todos os painéis, ou a
+    comparação não se lê). :meth:`para` devolve o mesmo recorte focado em um
+    clube — é o que faz um painel de um time só virar *small multiple*.
     """
 
     def __init__(
@@ -98,14 +112,35 @@ class Contexto:
         ano: int,
         cor: str = AZUL,
         cores_times: bool = False,
+        times: "Optional[list[str]]" = None,
+        cores: "Optional[dict[str, str]]" = None,
     ) -> None:
         self.df = df
         self.time = time
         self.ano = ano
         self.cor = cor
         self.cores_times = cores_times
+        self.times = list(times) if times else [time]
+        self.cores = dict(cores) if cores else {time: cor}
         self._df_ano: Optional[pd.DataFrame] = None
         self._df_time_ano: Optional[pd.DataFrame] = None
+
+    @property
+    def comparando(self) -> bool:
+        """``True`` quando o dashboard tem mais de um clube."""
+        return len(self.times) > 1
+
+    def para(self, time: str) -> "Contexto":
+        """O mesmo recorte, focado em um dos clubes (com a cor dele)."""
+        recorte = Contexto(
+            df=self.df,
+            time=time,
+            ano=self.ano,
+            cor=self.cores.get(time, self.cor),
+            cores_times=self.cores_times,
+        )
+        recorte._df_ano = self._df_ano  # o filtro por temporada é o mesmo
+        return recorte
 
     @property
     def df_ano(self) -> pd.DataFrame:
@@ -125,7 +160,8 @@ class Contexto:
         return self._df_time_ano
 
     def __repr__(self) -> str:
-        return f"Contexto(time={self.time!r}, ano={self.ano})"
+        alvo = self.times if self.comparando else self.time
+        return f"Contexto(time={alvo!r}, ano={self.ano})"
 
 
 Construtor = Callable[[Contexto], object]
@@ -147,6 +183,10 @@ class Painel:
     largura: int = 1  # em painéis: 1 = uma célula, 2 = duas células
     altura_min: int = 0  # px; a linha inteira cresce para caber o painel
     margem_esquerda: int = 0  # px que os rótulos do eixo y precisam à esquerda
+    # Com mais de um clube: "repetir" desenha o painel uma vez por clube
+    # (small multiples, mesma escala); "unico" desenha uma vez só e o
+    # construtor recebe ``ctx.times`` para pôr todos na mesma figura.
+    comparacao: str = "repetir"
 
 
 # ---------------------------------------------------------------------------
@@ -225,17 +265,25 @@ def _painel_indicadores(ctx: Contexto) -> "list[go.Indicator]":
 
 
 def _painel_evolucao(ctx: Contexto) -> go.Figure:
-    evolucao = analytics.evolucao_pontos(ctx.df, ctx.time, ctx.ano)
-    fig = viz.evolucao(evolucao, cores=ctx.cor, mostrar_legenda=False)
-    fig.layout.annotations = ()  # o título do painel já nomeia a série
+    evolucoes = pd.concat(
+        [analytics.evolucao_pontos(ctx.df, t, ctx.ano) for t in ctx.times],
+        ignore_index=True,
+    )
+    fig = viz.evolucao(
+        evolucoes,
+        cores=[ctx.cores[t] for t in ctx.times],
+        mostrar_legenda=ctx.comparando,
+    )
+    if not ctx.comparando:
+        fig.layout.annotations = ()  # o título do painel já nomeia a série
     return fig
 
 
 def _painel_classificacao(ctx: Contexto) -> go.Figure:
     return viz.classificacao(
         analytics.classificacao(ctx.df, ctx.ano),
-        cores=ctx.cor,
-        destaque=ctx.time,
+        cores=[ctx.cores[t] for t in ctx.times],
+        destaque=ctx.times,
         mostrar_valores=False,
     )
 
@@ -262,11 +310,18 @@ def _painel_adversarios_historico(ctx: Contexto) -> go.Figure:
     )
 
 
+def _historicos(ctx: Contexto) -> pd.DataFrame:
+    """As campanhas de todos os clubes do recorte, empilhadas."""
+    return pd.concat(
+        [analytics.historico_time(ctx.df, t) for t in ctx.times], ignore_index=True
+    )
+
+
 def _painel_historico(ctx: Contexto) -> go.Figure:
     fig = viz.historico(
-        analytics.historico_time(ctx.df, ctx.time),
+        _historicos(ctx),
         metrica="aproveitamento",
-        cores=ctx.cor,
+        cores=[ctx.cores[t] for t in ctx.times],
     )
     fig.add_vline(  # marca onde, na carreira do clube, está a temporada aberta
         x=ctx.ano,
@@ -277,7 +332,7 @@ def _painel_historico(ctx: Contexto) -> go.Figure:
 
 def _painel_posicao(ctx: Contexto) -> go.Figure:
     fig = viz.historico(
-        analytics.historico_time(ctx.df, ctx.time), metrica="posicao", cores=ctx.cor
+        _historicos(ctx), metrica="posicao", cores=[ctx.cores[t] for t in ctx.times]
     )
     fig.update_yaxes(autorange="reversed", title="Posição final")
     return fig
@@ -309,6 +364,7 @@ def _catalogo_inicial() -> "list[Painel]":
         ),
         Painel(
             nome="evolucao",
+            comparacao="unico",
             construir=_painel_evolucao,
             titulo=lambda ctx: f"Pontos acumulados em {ctx.ano}",
             descricao="Pontuação acumulada jogo a jogo na temporada",
@@ -321,6 +377,7 @@ def _catalogo_inicial() -> "list[Painel]":
         ),
         Painel(
             nome="classificacao",
+            comparacao="unico",
             construir=_painel_classificacao,
             titulo=lambda ctx: f"Classificação de {ctx.ano}",
             descricao="Tabela da temporada com o time destacado",
@@ -343,12 +400,14 @@ def _catalogo_inicial() -> "list[Painel]":
         ),
         Painel(
             nome="historico",
+            comparacao="unico",
             construir=_painel_historico,
             titulo="Aproveitamento por temporada",
             descricao="Toda a história do clube na base, com a temporada marcada",
         ),
         Painel(
             nome="posicao",
+            comparacao="unico",
             construir=_painel_posicao,
             titulo="Posição final por temporada",
             descricao="Toda a história do clube, do 1º lugar para baixo",
@@ -408,6 +467,7 @@ def registrar_painel(
     altura_min: int = 0,
     margem_esquerda: int = 0,
     tipo: str = "xy",
+    comparacao: str = "repetir",
 ) -> Painel:
     """Publica um painel seu no catálogo, reusável pelo nome.
 
@@ -434,6 +494,7 @@ def registrar_painel(
         altura_min=altura_min,
         margem_esquerda=margem_esquerda,
         tipo=tipo,
+        comparacao=comparacao,
     )
     PAINEIS[nome] = painel
     return painel
@@ -446,6 +507,7 @@ def paineis_disponiveis() -> pd.DataFrame:
             {
                 "painel": p.nome,
                 "padrao": p.nome in PAINEIS_PADRAO,
+                "comparacao": p.comparacao,
                 "descricao": p.descricao,
             }
             for p in PAINEIS.values()
@@ -539,12 +601,31 @@ class _Celula:
     conteudo: object  # go.Figure ou go.Indicator
     coluna: int  # 1-based, na grade de COLUNAS_GRADE colunas
     colspan: int
+    titulo: str = ""
 
 
 @dataclass
 class _Linha:
     celulas: "list[_Celula]" = field(default_factory=list)
     altura: int = 0
+    rotulo: "Optional[tuple[str, str]]" = None  # (texto, cor) acima da faixa
+
+
+@dataclass
+class _Grupo:
+    """O que um painel produziu: uma ou mais células, já com título."""
+
+    painel: Painel
+    celulas: "list[tuple[str, object]]"  # (título, figura ou indicador)
+    proprio: bool  # ocupa linha(s) inteira(s), com células de largura igual
+    rotulo: "Optional[tuple[str, str]]" = None
+    largura: "Optional[int]" = None  # em painéis; None = o que o painel pede
+
+
+# Quantas células por linha em small multiples, para os tiles saírem iguais
+# (só divisores de COLUNAS_GRADE): 4 clubes viram 2 linhas de 2.
+CELULAS_POR_LINHA = {1: 1, 2: 2, 3: 3, 4: 2}
+MAX_TIMES = max(CELULAS_POR_LINHA)
 
 
 def _distribuir(total: int, n: int) -> "list[int]":
@@ -553,42 +634,108 @@ def _distribuir(total: int, n: int) -> "list[int]":
     return [base + (1 if i < resto else 0) for i in range(n)]
 
 
-def _montar_linhas(construidos, colunas: int, altura_linha: int) -> "list[_Linha]":
-    """Distribui os painéis já construídos nas linhas da grade."""
+def _construir_grupos(paineis: "list[Painel]", ctx: Contexto) -> "list[_Grupo]":
+    """Roda cada painel no recorte e diz como ele ocupa a grade."""
+    grupos: "list[_Grupo]" = []
+    for painel in paineis:
+        titulo = _titulo_do_painel(painel, ctx, None)
+        if painel.tipo == "kpi":
+            # uma faixa de números por clube, rotulada com o nome dele
+            for time in ctx.times:
+                recorte = ctx.para(time) if ctx.comparando else ctx
+                indicadores = list(painel.construir(recorte))
+                grupos.append(
+                    _Grupo(
+                        painel=painel,
+                        celulas=[("", ind) for ind in indicadores],
+                        proprio=True,
+                        rotulo=(time, ctx.cores[time]) if ctx.comparando else None,
+                    )
+                )
+        elif painel.comparacao == "unico" or not ctx.comparando:
+            figura = painel.construir(ctx)
+            grupos.append(
+                _Grupo(
+                    painel=painel,
+                    celulas=[(_titulo_do_painel(painel, ctx, figura), figura)],
+                    proprio=False,
+                    largura=COLUNAS_GRADE if ctx.comparando else None,
+                )
+            )
+        else:
+            # small multiples: o mesmo painel, um por clube, lado a lado
+            celulas = []
+            for time in ctx.times:
+                recorte = ctx.para(time)
+                figura = painel.construir(recorte)
+                base = _titulo_do_painel(painel, recorte, figura) or titulo
+                celulas.append((f"{base} — {time}", figura))
+            grupos.append(_Grupo(painel=painel, celulas=celulas, proprio=True))
+    return grupos
+
+
+def _montar_linhas(
+    grupos: "list[_Grupo]", colunas: int, altura_linha: int
+) -> "list[_Linha]":
+    """Distribui os grupos já construídos nas linhas da grade."""
     largura_celula = COLUNAS_GRADE // colunas
     linhas: "list[_Linha]" = []
     atual = _Linha()
     ocupado = 0
 
-    for painel, conteudo in construidos:
-        if painel.tipo == "kpi":
-            if atual.celulas:
-                linhas.append(atual)
-                atual, ocupado = _Linha(), 0
-            indicadores = list(conteudo)
-            # a faixa de números ocupa linhas inteiras, até 6 indicadores cada
-            for inicio in range(0, len(indicadores), COLUNAS_GRADE):
-                bloco = indicadores[inicio : inicio + COLUNAS_GRADE]
-                linha = _Linha(altura=ALTURA_KPI)
+    def fechar() -> None:
+        nonlocal atual, ocupado
+        if atual.celulas:
+            linhas.append(atual)
+        atual, ocupado = _Linha(), 0
+
+    for grupo in grupos:
+        eh_kpi = grupo.painel.tipo == "kpi"
+        if grupo.proprio:
+            fechar()
+            n = len(grupo.celulas)
+            por_linha = (
+                min(n, COLUNAS_GRADE)
+                if eh_kpi
+                else CELULAS_POR_LINHA.get(n, min(n, COLUNAS_GRADE))
+            )
+            altura = ALTURA_KPI if eh_kpi else max(altura_linha, grupo.painel.altura_min)
+            if grupo.rotulo:
+                altura += ALTURA_ROTULO
+            for inicio in range(0, n, por_linha):
+                bloco = grupo.celulas[inicio : inicio + por_linha]
+                larguras = (
+                    _distribuir(COLUNAS_GRADE, len(bloco))
+                    if eh_kpi
+                    else [COLUNAS_GRADE // por_linha] * len(bloco)
+                )
+                linha = _Linha(
+                    altura=altura, rotulo=grupo.rotulo if inicio == 0 else None
+                )
                 coluna = 1
-                for indicador, span in zip(
-                    bloco, _distribuir(COLUNAS_GRADE, len(bloco))
-                ):
-                    linha.celulas.append(_Celula(painel, indicador, coluna, span))
-                    coluna += span
+                for (titulo, conteudo), largura in zip(bloco, larguras):
+                    linha.celulas.append(
+                        _Celula(grupo.painel, conteudo, coluna, largura, titulo)
+                    )
+                    coluna += largura
                 linhas.append(linha)
             continue
 
-        largura = min(painel.largura, colunas) * largura_celula
+        (titulo, conteudo) = grupo.celulas[0]
+        largura = (
+            COLUNAS_GRADE
+            if grupo.largura == COLUNAS_GRADE
+            else min(grupo.largura or grupo.painel.largura, colunas) * largura_celula
+        )
         if ocupado + largura > COLUNAS_GRADE and atual.celulas:
-            linhas.append(atual)
-            atual, ocupado = _Linha(), 0
-        atual.celulas.append(_Celula(painel, conteudo, ocupado + 1, largura))
-        atual.altura = max(atual.altura or altura_linha, painel.altura_min)
+            fechar()
+        atual.celulas.append(
+            _Celula(grupo.painel, conteudo, ocupado + 1, largura, titulo)
+        )
+        atual.altura = max(atual.altura or altura_linha, grupo.painel.altura_min)
         ocupado += largura
 
-    if atual.celulas:
-        linhas.append(atual)
+    fechar()
     return linhas
 
 
@@ -603,15 +750,19 @@ def _margens_horizontais(linhas: "list[_Linha]", colunas: int) -> "tuple[int, fl
     """
     esquerda = MARGEM_ESQUERDA
     calha_px = 0
+    por_linha = colunas
     for linha in linhas:
+        if linha.celulas and linha.celulas[0].painel.tipo != "kpi":
+            por_linha = max(por_linha, len(linha.celulas))
         for celula in linha.celulas:
             if celula.coluna == 1:
                 esquerda = max(esquerda, celula.painel.margem_esquerda)
             else:
                 calha_px = max(calha_px, celula.painel.margem_esquerda)
     disponivel = max(LARGURA_NOMINAL - esquerda - MARGEM_DIREITA, 240)
-    # o teto mantém cada painel pelo menos tão largo quanto a calha
-    teto = 1 / (2 * colunas - 1)
+    # dois tetos: manter cada painel ao menos tão largo quanto a calha, e
+    # respeitar o limite do Plotly (horizontal_spacing <= 1/(cols-1))
+    teto = min(1 / (2 * por_linha - 1), 1 / (COLUNAS_GRADE - 1) - 1e-6)
     return esquerda, min(teto, max(0.04, calha_px / disponivel))
 
 
@@ -711,6 +862,69 @@ def _copiar_figura(destino: go.Figure, origem: go.Figure, linha: int, coluna: in
 # ---------------------------------------------------------------------------
 
 
+def _resolver_times(df: pd.DataFrame, times) -> "list[str]":
+    """Normaliza o argumento ``time`` em uma lista de clubes resolvidos."""
+    pedidos = [times] if isinstance(times, str) else list(times)
+    if not pedidos:
+        raise ValueError("Informe ao menos um time para o dashboard.")
+    if len(pedidos) > MAX_TIMES:
+        raise ValueError(
+            f"Compare no máximo {MAX_TIMES} clubes por dashboard (pedidos: "
+            f"{len(pedidos)}). Acima disso as linhas se cruzam e os small "
+            "multiples ficam pequenos demais — divida em mais de uma figura."
+        )
+    resolvidos: "list[str]" = []
+    for pedido in pedidos:
+        time = analytics._resolver_time(df, pedido)
+        if time in resolvidos:
+            raise ValueError(f"{time!r} aparece mais de uma vez na comparação.")
+        resolvidos.append(time)
+    return resolvidos
+
+
+def _temporada_do_recorte(df: pd.DataFrame, times: "list[str]", ano) -> int:
+    """A temporada do dashboard: a informada, ou a última que TODOS disputaram.
+
+    Na comparação, "campeonato atual" é o ano mais recente em que todos os
+    clubes jogaram pontos corridos — o ano em que um deles subiu sozinho não
+    compara nada. Ano informado em que alguém não jogou é erro, e não um
+    painel estourando no meio da montagem.
+    """
+    if ano is not None:
+        ano = int(ano)
+        analytics._validar_ano(df, ano)
+        fora = [t for t in times if ano not in _temporadas_do_time(df, t)]
+        if fora:
+            raise ValueError(
+                f"{', '.join(repr(t) for t in fora)} não disputou a fase de "
+                f"pontos corridos de {ano}."
+            )
+        return ano
+
+    comuns = set.intersection(*(_temporadas_do_time(df, t) for t in times))
+    if not comuns:
+        raise ValueError(
+            f"{' e '.join(repr(t) for t in times)} nunca disputaram a mesma "
+            "temporada de pontos corridos — informe 'ano_campeonato' para "
+            "olhar campanhas de anos diferentes uma de cada vez."
+        )
+    return max(comuns)
+
+
+def _temporadas_do_time(df: pd.DataFrame, time: str) -> "set[int]":
+    """Os anos de pontos corridos que o clube disputou."""
+    corridos = analytics._pontos_corridos(df)
+    dele = corridos[(corridos["mandante"] == time) | (corridos["visitante"] == time)]
+    return {int(a) for a in dele["ano_campeonato"].dropna().unique()}
+
+
+def _paleta_dos_times(times: "list[str]", cores_times: bool) -> "dict[str, str]":
+    """Uma cor fixa por clube, válida para o dashboard inteiro."""
+    if cores_times:
+        return dict(zip(times, cores_para_times(times)))
+    return {t: CORES_CATEGORICAS[i % len(CORES_CATEGORICAS)] for i, t in enumerate(times)}
+
+
 def _titulo_do_painel(painel: Painel, ctx: Contexto, figura) -> str:
     if callable(painel.titulo):
         return painel.titulo(ctx)
@@ -721,8 +935,15 @@ def _titulo_do_painel(painel: Painel, ctx: Contexto, figura) -> str:
 
 
 def _subtitulo(ctx: Contexto) -> str:
-    jogos = ctx.df_time_ano.dropna(subset=["gols_mandante", "gols_visitante"])
-    partes = [f"Temporada {ctx.ano}", f"{len(jogos)} jogos"]
+    jogos = ctx.df_ano.dropna(subset=["gols_mandante", "gols_visitante"])
+    partes = [f"Temporada {ctx.ano}"]
+    if ctx.comparando:
+        partes.append(f"{len(ctx.times)} clubes lado a lado")
+    else:
+        do_time = jogos[
+            (jogos["mandante"] == ctx.time) | (jogos["visitante"] == ctx.time)
+        ]
+        partes.append(f"{len(do_time)} jogos")
     if not jogos.empty and jogos["data"].notna().any():
         partes.append(f"dados até {jogos['data'].max():%d/%m/%Y}")
     return " · ".join(partes)
@@ -730,7 +951,7 @@ def _subtitulo(ctx: Contexto) -> str:
 
 def dashboard_time(
     df: pd.DataFrame,
-    time: str,
+    time: Union[str, Sequence[str]],
     ano_campeonato: Optional[int] = None,
     *,
     ano: Optional[int] = None,
@@ -745,7 +966,7 @@ def dashboard_time(
     template: Optional[str] = None,
     **layout_kwargs,
 ) -> go.Figure:
-    """O dashboard de um time em uma temporada, em uma única ``go.Figure``.
+    """O dashboard de um (ou de vários) time em uma temporada, em uma figura.
 
     Sem ``ano_campeonato``, usa o campeonato atual da base (a última
     temporada que o time disputou, via
@@ -753,14 +974,23 @@ def dashboard_time(
     ``ano_campeonato=2020`` para ver uma temporada antiga com exatamente os
     mesmos painéis.
 
+    Passando uma **lista** de clubes, o mesmo padrão vira uma comparação:
+    cada painel decide como se comportar com N times (``Painel.comparacao``)
+    — ``"unico"`` põe todos na mesma figura (evolução, classificação,
+    histórico) e ``"repetir"`` vira *small multiples*, um tile por clube na
+    mesma escala (casa × fora, forma, adversários). Cada clube tem uma cor
+    fixa em todos os painéis: sem isso a comparação não se lê.
+
     Parameters
     ----------
     df:
         A OBT completa (``dashgusbr.carregar_dados()``).
     time:
-        Nome do clube, tolerante a acento e caixa ("gremio" → "Grêmio").
+        Nome do clube — ou uma lista de até quatro, para comparar. Tolerante
+        a acento e caixa ("gremio" → "Grêmio").
     ano_campeonato:
-        Temporada do recorte. ``None`` = campeonato atual da base. Também
+        Temporada do recorte. ``None`` = campeonato atual da base (na
+        comparação, a última temporada que **todos** disputaram). Também
         aceito como ``ano=``.
     paineis:
         Substitui a lista padrão inteira (:data:`PAINEIS_PADRAO`).
@@ -774,8 +1004,10 @@ def dashboard_time(
         Altura base de cada linha, em px; painéis densos (classificação,
         adversários) esticam a linha deles.
     cores_times:
-        ``True`` pinta as séries do clube com a cor oficial dele (opt-in: cor
-        de clube não é segura para daltonismo).
+        ``True`` pinta cada clube com a cor oficial dele (opt-in: cor de
+        clube não é segura para daltonismo — na comparação, dois alvinegros
+        ficam indistinguíveis; sem ela, cada clube recebe um slot da paleta
+        categórica validada).
     template:
         ``"dashgusbr_escuro"`` para o tema escuro.
     **layout_kwargs:
@@ -786,27 +1018,30 @@ def dashboard_time(
     >>> dashboard_time(df, "Palmeiras")                       # doctest: +SKIP
     >>> dashboard_time(df, "Palmeiras", 2020)                 # doctest: +SKIP
     >>> dashboard_time(df, "Santos", incluir=["sequencias"])  # doctest: +SKIP
+    >>> dashboard_time(df, ["Palmeiras", "Corinthians"], 2023)  # doctest: +SKIP
     """
     if colunas not in (1, 2, 3, 6):
         raise ValueError(f"'colunas' deve ser 1, 2, 3 ou 6 — recebido {colunas!r}.")
 
-    time = analytics._resolver_time(df, time)
-    escolhido = ano_campeonato if ano_campeonato is not None else ano
-    if escolhido is None:
-        escolhido = analytics.ultima_temporada(df, time)
-    else:
-        analytics._validar_ano(df, int(escolhido))
+    times = _resolver_times(df, time)
+    temporada = _temporada_do_recorte(
+        df, times, ano_campeonato if ano_campeonato is not None else ano
+    )
+    paleta = _paleta_dos_times(times, cores_times)
     ctx = Contexto(
         df=df,
-        time=time,
-        ano=int(escolhido),
-        cor=cor_time(time, AZUL) if cores_times else AZUL,
+        time=times[0],
+        ano=temporada,
+        cor=paleta[times[0]],
         cores_times=cores_times,
+        times=times,
+        cores=paleta,
     )
 
     selecionados = _selecionar(paineis, incluir, remover)
-    construidos = [(painel, painel.construir(ctx)) for painel in selecionados]
-    linhas = _montar_linhas(construidos, colunas, altura_linha)
+    linhas = _montar_linhas(
+        _construir_grupos(selecionados, ctx), colunas, altura_linha
+    )
 
     alturas = [linha.altura or altura_linha for linha in linhas]
     util = sum(alturas) + ESPACO_LINHA * (len(linhas) - 1)
@@ -843,21 +1078,15 @@ def dashboard_time(
         for celula in linha.celulas:
             if celula.painel.tipo == "kpi":
                 fig.add_trace(celula.conteudo, row=numero, col=celula.coluna)
+                if linha.rotulo and celula is linha.celulas[0]:
+                    _rotular_faixa(fig, fig.data[-1].domain, linha.rotulo)
                 continue
             ref_x, ref_y, legenda = _copiar_figura(
                 fig, celula.conteudo, numero, celula.coluna
             )
             if ref_x is None:
                 continue
-            _rotular(
-                fig,
-                ref_x,
-                ref_y,
-                _titulo_do_painel(celula.painel, ctx, celula.conteudo),
-                legenda,
-                tinta,
-                tinta_2,
-            )
+            _rotular(fig, ref_x, ref_y, celula.titulo, legenda, tinta, tinta_2)
 
     for anotacao in fig.layout.annotations:  # herdadas das figuras dos painéis
         if anotacao.font is not None and anotacao.font.color == TINTA_SECUNDARIA:
@@ -866,7 +1095,7 @@ def dashboard_time(
     fig.update_layout(
         template=template or TEMA,
         title=dict(
-            text=titulo or f"{time} — Brasileirão {ctx.ano}",
+            text=titulo or f"{' × '.join(times)} — Brasileirão {ctx.ano}",
             font=dict(size=22, color=tinta),
             x=0,
             xanchor="left",
@@ -896,6 +1125,27 @@ def dashboard_time(
     if layout_kwargs:
         fig.update_layout(**layout_kwargs)
     return fig
+
+
+def _rotular_faixa(fig, dominio, rotulo) -> None:
+    """Nome do clube acima da faixa de indicadores dele (na cor do clube).
+
+    Indicadores não têm eixo, então a âncora vem do ``domain`` da própria
+    trace, em coordenadas de papel.
+    """
+    texto, cor = rotulo
+    fig.add_annotation(
+        text=f"<b>{texto}</b>",
+        xref="paper",
+        yref="paper",
+        x=dominio.x[0],
+        xanchor="left",
+        y=dominio.y[1],
+        yanchor="bottom",
+        yshift=6,
+        showarrow=False,
+        font=dict(size=14, color=cor),
+    )
 
 
 def _rotular(fig, ref_x, ref_y, titulo, legenda, tinta, tinta_2) -> None:

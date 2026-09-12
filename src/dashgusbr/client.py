@@ -104,13 +104,21 @@ class Brasileirao:
     # -- dashboard ---------------------------------------------------------
 
     def dashboard(
-        self, time: str, ano_campeonato: Optional[int] = None, **kwargs
+        self,
+        time: Union[str, Iterable[str]],
+        ano_campeonato: Optional[int] = None,
+        **kwargs,
     ) -> go.Figure:
-        """Dashboard completo do time, com os painéis padrão, em uma figura.
+        """Dashboard completo do time (ou de vários), em uma única figura.
 
         Sem ``ano_campeonato``, mostra o campeonato atual da base (a última
         temporada que o time disputou); passe ``ano_campeonato=2020`` para
         ver uma temporada antiga com os mesmos painéis.
+
+        Uma **lista** de clubes liga a comparação: os painéis compartilhados
+        (evolução, classificação, histórico) põem todos na mesma figura e os
+        demais viram *small multiples*, um tile por clube na mesma escala.
+        Sem ano, o recorte é a última temporada que todos disputaram.
 
         Personalize sem perder o padrão: ``incluir=["sequencias"]``,
         ``remover=["adversarios"]``, ``incluir=[minha_figura]`` ou
@@ -123,11 +131,12 @@ class Brasileirao:
         >>> br.dashboard("Palmeiras").show()                      # doctest: +SKIP
         >>> br.dashboard("Palmeiras", ano_campeonato=2020).show() # doctest: +SKIP
         >>> br.dashboard("Santos", incluir=["placares"]).show()   # doctest: +SKIP
+        >>> br.dashboard(["Palmeiras", "Corinthians"], 2023).show()  # doctest: +SKIP
         """
         return dashboard.dashboard_time(self.df, time, ano_campeonato, **kwargs)
 
     def paineis(self) -> pd.DataFrame:
-        """O catálogo de painéis do dashboard: nome, se é padrão e descrição."""
+        """O catálogo de painéis: nome, se é padrão, como compara e descrição."""
         return dashboard.paineis_disponiveis()
 
     # -- classificação -----------------------------------------------------
