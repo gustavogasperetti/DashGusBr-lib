@@ -5,6 +5,10 @@ Todas as mudanças relevantes deste projeto são documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+> As seções `0.1.1`, `0.2.0` e `0.3.0` foram reconstruídas em set/2026 a partir
+> do conteúdo de cada tag: até então as entregas ficavam acumuladas em
+> "Não lançado" e o arquivo estava uma versão defasado.
+
 ## [Não lançado]
 
 ### Adicionado
@@ -25,6 +29,10 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
   `br.plot_tabela(2023, destaque="Santos")` acendem um time e apagam os demais.
 - **Campeonato atual**: `analytics.ultima_temporada(df, time=None)` — a última
   temporada da base (ou do time), usada quando o dashboard é chamado sem ano.
+
+## [0.3.0] - 2026-07-29
+
+### Adicionado
 - **Tema escuro** próprio: template `dashgusbr_escuro`, aplicável com
   `template="dashgusbr_escuro"` em qualquer `plot_*`/`viz.*`.
 - **Contraste automático**: rótulos que caem dentro de barras recebem cor de
@@ -45,8 +53,9 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
   com `data.carregar_geojson_estados()` (GeoJSON público, cacheado em disco).
 - **Validação de consistência**: `schema.relatorio_consistencia` /
   `br.validar()` — placares × resultados × pontos, datas, duplicatas.
-- **Cores de clube**: cauda longa mapeada (120 dos 167 clubes da base).
-- **Galeria de exemplos**: `examples/demo.py` agora gera
+- **Cores de clube**: cauda longa mapeada — de 54 para 120 dos 167 clubes
+  da base.
+- **Galeria de exemplos**: `examples/demo.py` passa a gerar
   `galeria_dashgusbr.html` com todos os gráficos e a chamada de cada um.
 - **Guia completo em notebook**: `examples/guia_dashgusbr.ipynb` percorre toda
   a API — gráficos, análises, personalização, exportação, validação, camadas
@@ -60,7 +69,7 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
   do filesystem no Windows) — causa de um teste intermitente.
 - `analytics.distribuicao_placares` valida o ano antes de filtrar.
 
-## [0.1.1] - 2026-07-22
+## [0.2.0] - 2026-07-23
 
 ### Adicionado
 - **Cores oficiais por time** (`cores_times=True` nos plots por time; `cor_time`
@@ -83,6 +92,14 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
   ("gremio" → "Grêmio"), com sugestões no erro.
 - Marcador `py.typed` e lint (`ruff`) no CI.
 
+## [0.1.1] - 2026-07-22
+
+### Adicionado
+- **CI/CD de release**: workflow `Release` (escolhe patch/minor/major, grava a
+  versão em `__init__.py`, commita, cria a tag e a Release com notas geradas
+  dos commits) e gatilho `workflow_dispatch` no `publish.yml`, que sobe o
+  pacote no PyPI a partir da tag.
+
 ## [0.1.0] - 2026-07-22
 
 ### Adicionado
@@ -91,6 +108,8 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Módulos de apoio `config`, `schema` e tema visual.
 - Suíte de testes (`pytest`) e exemplo de uso em `examples/demo.py`.
 
-[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.1...HEAD
+[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/gustavogasperetti/DashGusBr-lib/releases/tag/v0.1.0
