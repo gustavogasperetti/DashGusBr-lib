@@ -11,20 +11,7 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
-## [0.5.0] - 2026-09-15
-
-### Adicionado
-- **Comparação entre clubes**: `br.dashboard(["Palmeiras", "Corinthians"], 2023)`
-  — até quatro clubes no mesmo padrão de painéis. Painéis `unico` (evolução,
-  classificação, histórico, posição) põem todos na mesma figura; os demais
-  viram *small multiples*, um tile por clube na mesma escala; os indicadores
-  ganham uma faixa por clube. Cada clube tem cor fixa em todos os painéis e,
-  sem `ano_campeonato`, o recorte é a última temporada que **todos**
-  disputaram. A estratégia de cada painel fica na coluna `comparacao` de
-  `br.paineis()` e em `registrar_painel(..., comparacao=)`.
-- **`viz.historico` e `viz.classificacao` com vários times**: a primeira
-  aceita campanhas empilhadas (uma linha por clube) e a segunda aceita
-  `destaque=["Palmeiras", "Corinthians"]`.
+## [0.6.0] - 2026-09-15
 
 ### Corrigido
 - **Histórico dos clubes entre 1972 e 2000**: `historico_time` (e, por
@@ -41,6 +28,21 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
   não houver nenhuma). Os indicadores do dashboard passam a comparar com a
   temporada anterior de qualquer formato, sem delta de posição quando ela
   não existe.
+
+## [0.5.0] - 2026-09-12
+
+### Adicionado
+- **Comparação entre clubes**: `br.dashboard(["Palmeiras", "Corinthians"], 2023)`
+  — até quatro clubes no mesmo padrão de painéis. Painéis `unico` (evolução,
+  classificação, histórico, posição) põem todos na mesma figura; os demais
+  viram *small multiples*, um tile por clube na mesma escala; os indicadores
+  ganham uma faixa por clube. Cada clube tem cor fixa em todos os painéis e,
+  sem `ano_campeonato`, o recorte é a última temporada que **todos**
+  disputaram. A estratégia de cada painel fica na coluna `comparacao` de
+  `br.paineis()` e em `registrar_painel(..., comparacao=)`.
+- **`viz.historico` e `viz.classificacao` com vários times**: a primeira
+  aceita campanhas empilhadas (uma linha por clube) e a segunda aceita
+  `destaque=["Palmeiras", "Corinthians"]`.
 
 ## [0.4.0] - 2026-09-12
 
@@ -141,7 +143,8 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Módulos de apoio `config`, `schema` e tema visual.
 - Suíte de testes (`pytest`) e exemplo de uso em `examples/demo.py`.
 
-[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.5.0...HEAD
+[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.2.0...v0.3.0
