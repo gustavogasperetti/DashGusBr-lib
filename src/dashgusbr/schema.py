@@ -75,6 +75,16 @@ _COLUNAS_BOOLEANAS = ["is_mata_mata", "is_classico_estadual"]
 # Valor usado pelo ETL na coluna tipo_fase para jogos de pontos corridos
 TIPO_FASE_PONTOS_CORRIDOS = "Pontos Corridos"
 
+# Fases em formato de liga (todos contra todos dentro de um grupo), as únicas
+# em que pontos e aproveitamento fazem sentido. Entre 1972 e 2000 o
+# Brasileirão não teve "Pontos Corridos": a campanha era feita de fases
+# classificatórias e de grupos, seguidas de mata-mata.
+TIPOS_FASE_LIGA = (
+    TIPO_FASE_PONTOS_CORRIDOS,
+    "Fase Classificatória",
+    "Fase de Grupos",
+)
+
 
 class SchemaInvalidoError(ValueError):
     """Levantado quando a fonte de dados não contém o schema canônico da OBT."""

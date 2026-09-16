@@ -11,6 +11,8 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [0.5.0] - 2026-09-15
+
 ### Adicionado
 - **Comparação entre clubes**: `br.dashboard(["Palmeiras", "Corinthians"], 2023)`
   — até quatro clubes no mesmo padrão de painéis. Painéis `unico` (evolução,
@@ -23,6 +25,22 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - **`viz.historico` e `viz.classificacao` com vários times**: a primeira
   aceita campanhas empilhadas (uma linha por clube) e a segunda aceita
   `destaque=["Palmeiras", "Corinthians"]`.
+
+### Corrigido
+- **Histórico dos clubes entre 1972 e 2000**: `historico_time` (e, por
+  consequência, `resumo_time`, `viz.historico` e os painéis "histórico" e
+  "posição" do dashboard) pulava direto de 1971 para 2001, porque só
+  considerava jogos com `tipo_fase == "Pontos Corridos"` — e nesse período o
+  Brasileirão era disputado em fases classificatórias e de grupos. Agora
+  toda fase em formato de liga (`schema.TIPOS_FASE_LIGA`) entra na campanha.
+  A nova coluna `formato` diz se a linha veio da tabela de pontos corridos
+  ou da soma das fases de grupos; nesta última não há classificação geral
+  única, então `posicao` fica vazia (`Int64` com `<NA>`), o hover mostra "—"
+  e a linha de posição fica com um buraco no ano. `melhor_campanha` e
+  `pior_campanha` do resumo consideram só temporadas com posição (`None` se
+  não houver nenhuma). Os indicadores do dashboard passam a comparar com a
+  temporada anterior de qualquer formato, sem delta de posição quando ela
+  não existe.
 
 ## [0.4.0] - 2026-09-12
 
@@ -123,7 +141,8 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Módulos de apoio `config`, `schema` e tema visual.
 - Suíte de testes (`pytest`) e exemplo de uso em `examples/demo.py`.
 
-[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.4.0...HEAD
+[Não lançado]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gustavogasperetti/DashGusBr-lib/compare/v0.1.1...v0.2.0

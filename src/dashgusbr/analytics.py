@@ -19,7 +19,7 @@ from typing import Optional
 import pandas as pd
 
 from ._cores_times import _normalizar
-from .schema import TIPO_FASE_PONTOS_CORRIDOS
+from .schema import TIPO_FASE_PONTOS_CORRIDOS, TIPOS_FASE_LIGA
 
 # ---------------------------------------------------------------------------
 # Helpers internos
@@ -59,6 +59,35 @@ def _resolver_time(df: pd.DataFrame, time: str) -> str:
 def _pontos_corridos(df: pd.DataFrame) -> pd.DataFrame:
     """Mantém apenas jogos que contam para a tabela (fase de pontos corridos)."""
     return df[df["tipo_fase"] == TIPO_FASE_PONTOS_CORRIDOS]
+
+
+def _fases_liga(df: pd.DataFrame) -> pd.DataFrame:
+    """Mantém jogos em formato de liga: pontos corridos, classificatória e grupos.
+
+    É o recorte das campanhas históricas: entre 1972 e 2000 não existe fase
+    "Pontos Corridos" na base, e sem este filtro esses anos sumiriam do
+    histórico dos clubes.
+    """
+    return df[df["tipo_fase"].isin(TIPOS_FASE_LIGA)]
+
+
+def _formato_da_temporada(df_temporada: pd.DataFrame) -> str:
+    """``"pontos corridos"`` ou ``"grupos"``, conforme a fase de liga dominante.
+
+    Uma temporada é de pontos corridos quando essa é a fase de liga com mais
+    jogos (1971 e 2001 em diante). Em 1989, por exemplo, a base tem 20 jogos
+    "Pontos Corridos" (um grupo de repescagem) dentro de um campeonato de
+    grupos: a temporada é tratada como de grupos.
+    """
+    liga = _fases_liga(df_temporada)
+    if liga.empty:
+        return "grupos"
+    contagem = liga["tipo_fase"].value_counts()
+    return (
+        "pontos corridos"
+        if contagem.idxmax() == TIPO_FASE_PONTOS_CORRIDOS
+        else "grupos"
+    )
 
 
 def _com_placar(df: pd.DataFrame) -> pd.DataFrame:
@@ -151,6 +180,11 @@ def classificacao(df: pd.DataFrame, ano: int) -> pd.DataFrame:
     """
     _validar_ano(df, ano)
     temporada = _com_placar(_pontos_corridos(df[df["ano_campeonato"] == ano]))
+    return _tabela_de_campanhas(temporada)
+
+
+def _tabela_de_campanhas(temporada: pd.DataFrame) -> pd.DataFrame:
+    """Agrega jogos (já filtrados) em uma tabela ordenada pelo critério CBF."""
     longo = _formato_longo(temporada)
 
     tabela = (
@@ -225,30 +259,50 @@ def evolucao_pontos(df: pd.DataFrame, time: str, ano: int) -> pd.DataFrame:
 def historico_time(df: pd.DataFrame, time: str) -> pd.DataFrame:
     """Desempenho de um time temporada a temporada (posição, pontos, aproveitamento).
 
+    Cobre todas as temporadas em que o clube disputou alguma fase em formato
+    de liga (pontos corridos, classificatória ou de grupos), inclusive o
+    período 1972-2000, em que o Brasileirão não teve pontos corridos.
+
+    A coluna ``formato`` diz como cada linha foi calculada:
+
+    - ``"pontos corridos"``: a linha do clube na :func:`classificacao` da
+      temporada — posição, pontos e aproveitamento da tabela oficial;
+    - ``"grupos"``: soma de todos os jogos de fases classificatórias e de
+      grupos do ano. Não há classificação geral única nesse formato, então
+      ``posicao`` fica vazia (``<NA>``).
+
     O aproveitamento é comparável entre eras (normalizado pelo valor da
-    vitória de cada temporada); a posição vem da classificação completa
-    da fase de pontos corridos de cada ano.
+    vitória de cada temporada).
     """
     time = _resolver_time(df, time)
-    pontos_corridos = _pontos_corridos(df)
+    liga = _fases_liga(df)
     anos = sorted(
-        pontos_corridos[
-            (pontos_corridos["mandante"] == time)
-            | (pontos_corridos["visitante"] == time)
-        ]["ano_campeonato"].dropna().unique()
+        liga[(liga["mandante"] == time) | (liga["visitante"] == time)][
+            "ano_campeonato"
+        ]
+        .dropna()
+        .unique()
     )
     linhas = []
     for ano in anos:
-        tabela = classificacao(df, int(ano))
+        temporada = df[df["ano_campeonato"] == ano]
+        formato = _formato_da_temporada(temporada)
+        if formato == "pontos corridos":
+            tabela = classificacao(df, int(ano))
+        else:
+            tabela = _tabela_de_campanhas(_com_placar(_fases_liga(temporada)))
+            tabela["posicao"] = pd.NA
         linha = tabela[tabela["time"] == time]
         if linha.empty:
             continue
         registro = linha.iloc[0].to_dict()
         registro["ano_campeonato"] = int(ano)
+        registro["formato"] = formato
         linhas.append(registro)
     if not linhas:
-        raise ValueError(f"{time!r} nunca disputou fases de pontos corridos na base.")
+        raise ValueError(f"{time!r} nunca disputou fases de liga na base.")
     historico = pd.DataFrame(linhas)
+    historico["posicao"] = historico["posicao"].astype("Int64")
     colunas = ["ano_campeonato"] + [c for c in historico.columns if c != "ano_campeonato"]
     return historico[colunas].reset_index(drop=True)
 
@@ -736,7 +790,8 @@ def resumo_time(df: pd.DataFrame, time: str) -> dict:
     """Cartão-resumo de um clube: totais, campanhas e recordes.
 
     Retorna um dict com temporadas disputadas, totais de jogos/V/E/D/gols,
-    aproveitamento histórico, melhor e pior campanha (ano/posição) e as
+    aproveitamento histórico, melhor e pior campanha (ano/posição, entre as
+    temporadas de pontos corridos; ``None`` se não houver nenhuma) e as
     maiores vitória e derrota (com placar, adversário e data).
     """
     time = _resolver_time(df, time)
@@ -746,8 +801,17 @@ def resumo_time(df: pd.DataFrame, time: str) -> dict:
         raise ValueError(f"{time!r} não tem jogos com placar na base.")
 
     campanhas = historico_time(df, time)
-    melhor = campanhas.loc[campanhas["posicao"].idxmin()]
-    pior = campanhas.loc[campanhas["posicao"].idxmax()]
+    # Melhor/pior campanha só faz sentido onde há posição (pontos corridos).
+    com_posicao = campanhas.dropna(subset=["posicao"])
+    melhor = pior = None
+    if not com_posicao.empty:
+        melhor = com_posicao.loc[com_posicao["posicao"].idxmin()]
+        pior = com_posicao.loc[com_posicao["posicao"].idxmax()]
+
+    def _campanha(linha) -> Optional[dict]:
+        if linha is None:
+            return None
+        return {"ano": int(linha["ano_campeonato"]), "posicao": int(linha["posicao"])}
 
     saldo_jogo = jogos["gols_pro"] - jogos["gols_contra"]
 
@@ -772,14 +836,8 @@ def resumo_time(df: pd.DataFrame, time: str) -> dict:
         "gols_pro": int(jogos["gols_pro"].sum()),
         "gols_contra": int(jogos["gols_contra"].sum()),
         "aproveitamento": _aproveitamento(jogos, _valores_vitoria_por_ano(df)),
-        "melhor_campanha": {
-            "ano": int(melhor["ano_campeonato"]),
-            "posicao": int(melhor["posicao"]),
-        },
-        "pior_campanha": {
-            "ano": int(pior["ano_campeonato"]),
-            "posicao": int(pior["posicao"]),
-        },
+        "melhor_campanha": _campanha(melhor),
+        "pior_campanha": _campanha(pior),
         "maior_vitoria": _partida(saldo_jogo.idxmax()),
         "maior_derrota": _partida(saldo_jogo.idxmin()),
     }

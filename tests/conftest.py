@@ -41,6 +41,26 @@ def obt(csv_texto) -> pd.DataFrame:
     return schema.validar(schema.normalizar(bruto))
 
 
+# Temporada de 1985 no formato da época: fases de grupos e classificatória
+# (vitória = 2 pontos), sem nenhum jogo "Pontos Corridos", mais uma semifinal
+# que não conta. O Grêmio só aparece aqui, para exercitar um clube sem
+# nenhuma temporada de pontos corridos.
+CSV_GRUPOS_1985 = """\
+12,1985,1985-09-01,Palmeiras,Santos,SP,SP,2.0,0.0,V,D,NORMAL,A,Fase de Grupos,False,True,2,2,-2,2,0
+13,1985,1985-09-08,Botafogo,Palmeiras,RJ,SP,1.0,1.0,E,E,NORMAL,A,Fase de Grupos,False,False,2,0,0,1,1
+14,1985,1985-09-15,Santos,Botafogo,SP,RJ,3.0,1.0,V,D,NORMAL,1F,Fase Classificatória,False,False,4,2,-2,2,0
+15,1985,1985-09-22,Grêmio,Palmeiras,RS,SP,0.0,2.0,D,V,NORMAL,B,Fase de Grupos,False,False,2,-2,2,0,2
+16,1985,1985-10-06,Palmeiras,Santos,SP,SP,0.0,1.0,D,V,NORMAL,SF,Semifinal,True,True,1,-1,1,0,2
+"""
+
+
+@pytest.fixture()
+def obt_eras(csv_texto) -> pd.DataFrame:
+    """A mini-OBT com uma temporada de grupos (1985) entre 1971 e 2023."""
+    bruto = pd.read_csv(io.StringIO(csv_texto + CSV_GRUPOS_1985))
+    return schema.validar(schema.normalizar(bruto))
+
+
 @pytest.fixture()
 def caminho_csv(tmp_path, csv_texto) -> str:
     """A mini-OBT gravada em disco, para exercitar a carga por caminho local."""

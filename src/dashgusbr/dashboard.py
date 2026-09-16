@@ -206,20 +206,16 @@ def _linha_do_time(ctx: Contexto) -> pd.Series:
 
 
 def _temporada_anterior(ctx: Contexto) -> Optional[pd.Series]:
-    """A campanha do time na temporada anterior que ele disputou, se houver."""
-    corridos = analytics._pontos_corridos(ctx.df)
-    do_time = corridos[
-        (corridos["mandante"] == ctx.time) | (corridos["visitante"] == ctx.time)
-    ]
-    anteriores = do_time["ano_campeonato"].dropna()
-    anteriores = anteriores[anteriores < ctx.ano]
+    """A campanha do time na temporada anterior que ele disputou, se houver.
+
+    Vem do histórico completo, então uma temporada de grupos (1972-2000)
+    também serve de referência — nela só a posição fica vazia.
+    """
+    historico = analytics.historico_time(ctx.df, ctx.time)
+    anteriores = historico[historico["ano_campeonato"] < ctx.ano]
     if anteriores.empty:
         return None
-    anterior = Contexto(ctx.df, ctx.time, int(anteriores.max()))
-    try:
-        return _linha_do_time(anterior)
-    except ValueError:  # jogou no ano, mas não entrou na classificação
-        return None
+    return anteriores.iloc[-1]
 
 
 def _painel_indicadores(ctx: Contexto) -> "list[go.Indicator]":
@@ -239,9 +235,9 @@ def _painel_indicadores(ctx: Contexto) -> "list[go.Indicator]":
 
     indicadores = []
     for rotulo, coluna, sufixo, formato, comparar, menor_melhor in kpis:
-        referencia = (
-            float(anterior[coluna]) if comparar and anterior is not None else None
-        )
+        referencia = None
+        if comparar and anterior is not None and not pd.isna(anterior[coluna]):
+            referencia = float(anterior[coluna])
         indicador = go.Indicator(
             mode="number+delta" if referencia is not None else "number",
             value=float(atual[coluna]),

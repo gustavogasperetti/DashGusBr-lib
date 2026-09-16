@@ -273,21 +273,32 @@ def historico(
             if "time" in historico_df.columns
             else historico_df
         )
+        # Temporadas de grupos (1972-2000) não têm posição: o hover mostra
+        # "—" em vez de <NA>, e a linha da métrica fica com um buraco no ano.
+        posicao = serie["posicao"].map(
+            lambda p: "—" if pd.isna(p) else f"{int(p)}º"
+        )
         fig.add_trace(
             go.Scatter(
                 x=serie["ano_campeonato"],
-                y=serie[metrica],
+                y=serie[metrica].astype("float"),
                 mode="lines+markers",
                 name=time,
                 line=dict(color=paleta[i], width=2),
                 marker=dict(size=8, color=paleta[i]),
-                customdata=serie[["posicao", "pontos", "jogos"]],
+                customdata=pd.DataFrame(
+                    {
+                        "posicao": posicao,
+                        "pontos": serie["pontos"],
+                        "jogos": serie["jogos"],
+                    }
+                ),
                 hovertemplate=(
                     f"<b>{time} — %{{x}}</b><br>" if time else "<b>%{x}</b><br>"
                 )
                 + (
                     f"{metrica}: %{{y}}<br>"
-                    "Posição: %{customdata[0]}º · %{customdata[1]} pts em "
+                    "Posição: %{customdata[0]} · %{customdata[1]} pts em "
                     "%{customdata[2]} jogos<extra></extra>"
                 ),
             )

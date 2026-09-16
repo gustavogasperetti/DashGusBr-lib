@@ -311,7 +311,10 @@ as colunas obrigatórias. Schema canônico:
 > normalizado pelo valor da vitória da temporada — a única métrica comparável entre eras.
 
 Apenas jogos com `tipo_fase == "Pontos Corridos"` entram na classificação e nas estatísticas de
-temporada; o confronto direto considera todas as fases.
+temporada; o confronto direto considera todas as fases. O **histórico do clube** (`historico_time`,
+`viz.historico`, painéis "histórico" e "posição") cobre também as fases classificatórias e de grupos,
+porque entre 1972 e 2000 o Brasileirão não teve pontos corridos: nessas temporadas a coluna
+`formato` vale `"grupos"` e a `posicao` fica vazia, já que não existe classificação geral única.
 
 ## Desenvolvimento
 
